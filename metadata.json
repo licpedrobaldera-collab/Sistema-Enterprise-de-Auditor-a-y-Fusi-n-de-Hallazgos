@@ -1,0 +1,8 @@
+{
+  "name": "Sistema Enterprise de Auditoría y Fusión de Hallazgos",
+  "description": "Plataforma corporativa de auditoría forense, financiera y de control gubernamental con extracción multiformato, fusión inteligente de hallazgos, edición en vivo y exportación avanzada en PDF, Excel y Word.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
