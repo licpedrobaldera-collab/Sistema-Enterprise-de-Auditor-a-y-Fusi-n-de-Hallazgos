@@ -28,20 +28,24 @@ TITLE Sistema de Auditoria y Fusion de Hallazgos con IA - Lic. Pedro Baldera
 COLOR 0A
 cls
 echo ===============================================================================
-echo   SISTEMA ENTERPRISE DE AUDITORIA, EXTRACCIÓN Y FUSIÓN DE HALLAZGOS CON IA
+echo   SISTEMA ENTERPRISE DE AUDITORIA, EXTRACCION Y FUSION DE HALLAZGOS CON IA
 echo   Iniciando servidor local y abriendo interfaz grafica automatica...
 echo ===============================================================================
 echo.
 
-:: Verificar dependencias
+:: Crear carpetas necesarias automaticamente
+if not exist "evidencias_auditoria" mkdir evidencias_auditoria
+if not exist "reportes_exportados" mkdir reportes_exportados
+
+:: Verificar e instalar dependencias transparentemente
 python -m streamlit --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [!] Instalando dependencias requeridas (streamlit, pandas, openpyxl, python-docx, PyMuPDF)...
+    echo [!] Instalando dependencias requeridas (streamlit, pandas, openpyxl, python-docx, PyMuPDF, pillow)...
     pip install streamlit pandas openpyxl python-docx PyMuPDF pillow
 )
 
-echo [OK] Iniciando aplicacion interactiva en el navegador...
-python -m streamlit run sistema_analisis_hallazgos_baldera_V2.py --server.headless=false --server.port=8501
+echo [OK] Iniciando aplicacion para PC, tablet y celular en la red local...
+python -m streamlit run sistema_analisis_hallazgos_baldera_V2.py --server.headless=false --server.address=0.0.0.0 --server.port=8501
 
 pause`;
 

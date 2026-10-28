@@ -131,13 +131,27 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         const payload = action.payload || {};
         const newFinding: AuditFinding = {
           id: Date.now() % 10000,
+          numero_hallazgo: `V.${Date.now() % 1000}`,
+          pagina_referencia: 'Dictado por Voz Directo',
           titulo: payload.titulo || transcript,
           rubro: payload.rubro || 'Gobernanza y Control Interno',
-          descripcion: payload.descripcion || 'Hallazgo registrado mediante dictado por voz.',
+          condicion:
+            payload.descripcion ||
+            'Hallazgo registrado mediante dictado por voz y validado por auditor.',
+          criterio: payload.criterio || 'Normativa de Control Interno Vigente; Ley 10-07.',
+          causa: 'Debilidad de control detectada durante la entrevista pericial.',
+          efecto: 'Riesgo operativo y patrimonial.',
           monto: Number(payload.monto) || 0,
+          recomendacion: 'Implementar medidas correctivas inmediatas.',
+          conclusion: 'Hallazgo admitido para sustento pericial.',
           riesgo: (payload.riesgo as RiskLevel) || 'Medio',
           fusion_id: payload.fusion_id || 'FUS-01',
-          criterio: payload.criterio || 'Normativa de Control Interno Vigente',
+          puntuacion_calidad: 8.5,
+          estado_supervision: 'Requiere Ajuste',
+          incidencia_supervisor:
+            'Registrado por comando vocal; requiere foliado de documento físico.',
+          ajuste_recomendado_supervisor:
+            'Vincular soporte documental físico o digital para elevar a 10/10.',
           fecha_registro: new Date().toISOString().slice(0, 10),
           estado: 'Confirmado',
         };
