@@ -26,6 +26,7 @@ import { ExtractorPanel } from './components/ExtractorPanel';
 import { FindingsTable } from './components/FindingsTable';
 import { FusionMatrixTable } from './components/FusionMatrixTable';
 import { RiskMatrixHeatmap } from './components/RiskMatrixHeatmap';
+import { AuditChartsDashboard } from './components/AuditChartsDashboard';
 import { InstitutionalConfigModal } from './components/InstitutionalConfigModal';
 import { VoiceAssistantModal } from './components/VoiceAssistantModal';
 import { CmdConsoleModal } from './components/CmdConsoleModal';
@@ -450,7 +451,7 @@ export default function App() {
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md transition"
               >
                 <RotateCcw className="w-4 h-4" />
-                Restaurar Catálogo Forense Completo (24 Hallazgos)
+                Restaurar Caso Real Los Mina CCRD (54 Hallazgos Reales)
               </button>
               <button
                 onClick={() => setIsCaseHistoryOpen(true)}
@@ -465,6 +466,9 @@ export default function App() {
 
         {/* 2. Interactive Risk Matrix & Financial Heatmap */}
         <RiskMatrixHeatmap findings={findings} currency={config.currency_symbol || config.currency} />
+
+        {/* 2.1 Visual Risk & Budget Dashboard (Recharts Radar & Bar Charts) */}
+        <AuditChartsDashboard findings={findings} currency={config.currency_symbol || config.currency} />
 
         {/* 3. Matriz de Hallazgos Reales (Editable Table with 0-10 supervisor rating) */}
         <FindingsTable

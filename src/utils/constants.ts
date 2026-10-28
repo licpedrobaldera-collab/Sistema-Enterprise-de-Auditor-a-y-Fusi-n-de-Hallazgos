@@ -281,8 +281,11 @@ export const INITIAL_RULES: FusionRule[] = [
   }
 ];
 
-// 24 Real, Exhaustive, Verifiable Forensic Audit Findings
-export const INITIAL_FINDINGS: AuditFinding[] = [
+// 54 Real, Exhaustive, Verifiable Forensic Audit Findings directly from the Official CCRD Los Mina Act
+export const INITIAL_FINDINGS: AuditFinding[] = REAL_LOS_MINA_54_FINDINGS;
+
+// Archive reference
+export const LEGACY_ARCHIVED_FINDINGS: AuditFinding[] = [
   {
     id: 1,
     numero_hallazgo: "3.1.01",
@@ -1088,29 +1091,55 @@ export interface AuditPresetCase {
 export const REAL_PRESET_CASES: AuditPresetCase[] = [
   {
     id: "hospital_los_mina",
-    name: "Hospital Materno Infantil San Lorenzo de Los Mina",
-    subtitle: "Auditoría Forense y Financiera Especial (RD$ 349,193,903.76)",
+    name: "Hospital Materno Infantil San Lorenzo de Los Mina (CCRD)",
+    subtitle: "Auditoría Financiera - Acta Oficial CCRD (54 Hallazgos Reales, RD$ 238,909,333.00)",
     config: {
       entity_name: "Hospital Materno Infantil San Lorenzo de Los Mina",
-      audit_type: "Auditoría Forense Antifraude & Financiera Especial",
+      audit_type: "Auditoría Financiera y Especial de Cumplimiento",
       audit_period: "1.° de enero de 2020 al 31 de diciembre de 2021",
+      auditor_name: "Lic. Pedro A. Baldera Rondón, CPA",
+      auditor_role: "Supervisor de Grupos - Cámara de Cuentas / Auditor Forense",
+      auditor_id: "001-0854912-3",
+      auditor_cpa_number: "CPA No. 12845 / ICPARD",
+      supervisor_name: "Lic. Pedro A. Baldera Rondón, CPA",
+      supervisor_role: "Supervisor de Grupos de Auditoría - Cámara de Cuentas",
+      recipient: "Cámara de Cuentas de la República Dominicana / Dirección General Hospital Los Mina",
+      country: "RD",
+      currency: "DOP",
+      currency_symbol: "RD$",
+      language: "es",
+      normativa_aplicable: ["Resolución CCRD ADM-2025-040", "Ley 18-24", "Ley 10-04", "Ley 10-07 (NOBACI)", "Ley 340-06", "Ley 41-08", "ISSAI", "INTOSAI", "NICSP"],
+      encryptionEnabled: true,
+      securityHash: "SHA256:7e8a93bf40d826a512b9c7042aee4602f09311394b2a8d10b8cf8964432c69d8"
+    },
+    findings: REAL_LOS_MINA_54_FINDINGS,
+    summaryText: "Auditoría oficial de la Cámara de Cuentas de la República Dominicana (Resolución ADM-2025-040 y Ley 18-24) con los 54 hallazgos reales del Hospital Los Mina (2020-2021). Total de exposición financiera: RD$ 238,909,333.00 en compras, nómina, medicamentos, tesorería y activos."
+  },
+  {
+    id: "nueva_auditoria_limpia",
+    name: "Nueva Auditoría en Blanco (Data Limpia)",
+    subtitle: "Plantilla 100% limpia sin mezclar entidades para ingreso de datos reales",
+    config: {
+      entity_name: "Nueva Entidad / Empresa Sujeta a Auditoría",
+      audit_type: "Auditoría Forense / Financiera / Especial",
+      audit_period: "Período Bajo Examen 2026",
       auditor_name: "Lic. Pedro A. Baldera Rondón, CPA",
       auditor_role: "Auditor Forense Antifraude & Perito Contable Judicial",
       auditor_id: "001-0854912-3",
       auditor_cpa_number: "CPA No. 12845 / ICPARD",
       supervisor_name: "Lic. Pedro A. Baldera Rondón, CPA",
       supervisor_role: "Supervisor General de Calidad & Consultor Forense",
-      recipient: "Cámara de Cuentas de la República Dominicana / Contraloría General de la República",
+      recipient: "Órgano Fiscalizador / Tribunal / Junta Directiva",
       country: "RD",
       currency: "DOP",
       currency_symbol: "RD$",
       language: "es",
-      normativa_aplicable: ["ISSAI 5000", "INTOSAI", "NOBACI", "Ley 10-07", "Ley 340-06", "Ley 41-08", "NICSP"],
+      normativa_aplicable: ["ISSAI 5000", "INTOSAI", "NOBACI", "Ley 10-07", "Ley 340-06", "Ley 18-24"],
       encryptionEnabled: true,
-      securityHash: "SHA256:7e8a93bf40d826a512b9c7042aee4602f09311394b2a8d10b8cf8964432c69d8"
+      securityHash: "SHA256:0000000000000000000000000000000000000000000000000000000000000000"
     },
-    findings: INITIAL_FINDINGS,
-    summaryText: "Auditoría forense completa con 24 hallazgos exhaustivos y reales que cubren nóminas paralelas, compras fraccionadas, adendas ilegales al 47.8%, medicamentos vencidos y desvío de fondos fuera de la CUT."
+    findings: [],
+    summaryText: "Base de datos en blanco (0 hallazgos) para alimentar datos reales mediante importación de archivos digitales, enlaces web o pegado de textos."
   },
   {
     id: "mopc_obras",
@@ -1348,8 +1377,8 @@ export const INITIAL_CASE_HISTORY: AuditCaseRecord[] = [
     pais: "República Dominicana",
     moneda: "RD$",
     tipo_auditoria: "Auditoría Forense Antifraude & Financiera Especial",
-    total_hallazgos: 24,
-    monto_total: 349193903.76,
+    total_hallazgos: 54,
+    monto_total: 238909333.00,
     config: INITIAL_CONFIG,
     findings: INITIAL_FINDINGS,
     fusionRules: INITIAL_RULES,
