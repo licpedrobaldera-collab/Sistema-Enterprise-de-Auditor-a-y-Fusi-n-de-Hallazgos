@@ -16,6 +16,10 @@ import {
   ChevronUp,
   Maximize2,
   BookOpen,
+  Scale,
+  CheckCircle2,
+  XCircle,
+  Check
 } from 'lucide-react';
 import { AuditFinding, RiskLevel, FusionRule, SupervisorStatus } from '../types/audit';
 import { formatCurrency } from '../utils/exporters';
@@ -44,6 +48,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
   const [selectedRisk, setSelectedRisk] = useState<string>('ALL');
   const [selectedFusion, setSelectedFusion] = useState<string>('ALL');
   const [selectedSupervision, setSelectedSupervision] = useState<string>('ALL');
+  const [selectedValidation, setSelectedValidation] = useState<string>('ALL');
 
   // Detailed Modal / Edit State
   const [editingFinding, setEditingFinding] = useState<AuditFinding | null>(null);
@@ -54,6 +59,12 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
   const [newForm, setNewForm] = useState<Partial<AuditFinding>>({
     numero_hallazgo: '3.1.01',
     pagina_referencia: 'Pág. 10 - Acta de Hallazgos',
+    punto_incidencia: 'Folio 42, Párrafo 2',
+    norma_ley_nombre: 'Ley No. 340-06 de Compras y Contrataciones',
+    articulo: 'Art. 14',
+    numeral: 'Numeral 2',
+    literal: 'Literal b',
+    fuente_cruzada: 'Cotejo entre Registro Mercantil vs Ofertas Presentadas',
     titulo: '',
     rubro: 'Gobernanza y Control Interno',
     condicion: '',
@@ -65,10 +76,12 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
     conclusion: 'Se determina incumplimiento a la normativa gubernamental vigente.',
     riesgo: 'Alto',
     fusion_id: 'FUS-01',
-    puntuacion_calidad: 8.5,
-    estado_supervision: 'Requiere Ajuste',
-    incidencia_supervisor: 'Falta cuantificar la muestra analizada según guías de la Cámara de Cuentas.',
-    ajuste_recomendado_supervisor: 'Incorporar el universo total y citar el artículo específico para elevar a 10/10.',
+    puntuacion_calidad: 10.0,
+    estado_supervision: 'Aprobado (10/10)',
+    estado_validacion: 'Validado por Auditor',
+    incidencia_supervisor: 'Cumple con normas vigentes.',
+    ajuste_recomendado_supervisor: 'Punto calificado con 10/10 sin debilidades.',
+    cadena_custodia: 'CCRD-EVID-2026-F42-78A1',
     evidencia_soporte: '',
   });
 
@@ -87,6 +100,8 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
         f.condicion.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (f.numero_hallazgo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (f.pagina_referencia || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (f.norma_ley_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (f.punto_incidencia || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         f.id.toString().includes(searchTerm);
 
       const matchRubro = selectedRubro === 'ALL' || f.rubro === selectedRubro;
@@ -94,10 +109,12 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
       const matchFusion = selectedFusion === 'ALL' || f.fusion_id === selectedFusion;
       const matchSupervision =
         selectedSupervision === 'ALL' || f.estado_supervision === selectedSupervision;
+      const matchValidation =
+        selectedValidation === 'ALL' || (f.estado_validacion || 'Validado por Auditor') === selectedValidation;
 
-      return matchSearch && matchRubro && matchRisk && matchFusion && matchSupervision;
+      return matchSearch && matchRubro && matchRisk && matchFusion && matchSupervision && matchValidation;
     });
-  }, [findings, searchTerm, selectedRubro, selectedRisk, selectedFusion, selectedSupervision]);
+  }, [findings, searchTerm, selectedRubro, selectedRisk, selectedFusion, selectedSupervision, selectedValidation]);
 
   // Total amount observed
   const totalAmount = useMemo(() => {
@@ -116,6 +133,36 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
     }
   };
 
+  const handleQuickValidate = (finding: AuditFinding) => {
+    onUpdateFinding({
+      ...finding,
+      estado_supervision: 'Aprobado (10/10)',
+      puntuacion_calidad: 10.0,
+      estado_validacion: 'Validado por Auditor',
+      incidencia_supervisor: 'Punto validado por auditor con trazabilidad completa. Cumple normas.',
+      ajuste_recomendado_supervisor: 'Calificación 10/10 definitiva para informe judicial.',
+    });
+  };
+
+  const handleQuickDiscard = (finding: AuditFinding) => {
+    onUpdateFinding({
+      ...finding,
+      estado_validacion: 'Descartado',
+      estado_supervision: 'Requiere Ajuste',
+    });
+  };
+
+  const handleValidateAllFiltered = () => {
+    filteredFindings.forEach((f) => {
+      onUpdateFinding({
+        ...f,
+        estado_supervision: 'Aprobado (10/10)',
+        puntuacion_calidad: 10.0,
+        estado_validacion: 'Validado por Auditor',
+      });
+    });
+  };
+
   const handleCreateFinding = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newForm.titulo?.trim()) return;
@@ -127,10 +174,16 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
       id: nextId,
       numero_hallazgo: newForm.numero_hallazgo?.trim() || `3.1.${nextId}`,
       pagina_referencia: newForm.pagina_referencia?.trim() || 'Pág. General',
+      punto_incidencia: newForm.punto_incidencia?.trim() || 'Folio y acta del expediente',
+      norma_ley_nombre: newForm.norma_ley_nombre?.trim() || 'Ley de Control Gubernamental',
+      articulo: newForm.articulo?.trim() || 'Art. de Ley',
+      numeral: newForm.numeral?.trim() || 'Numeral 1',
+      literal: newForm.literal?.trim() || 'Literal a',
+      fuente_cruzada: newForm.fuente_cruzada?.trim() || 'Cotejo contra registros oficiales',
       titulo: newForm.titulo.trim(),
       rubro: newForm.rubro || 'Gobernanza y Control Interno',
       condicion: newForm.condicion?.trim() || 'Condición observada documentada.',
-      criterio: newForm.criterio?.trim() || 'Normativa de Control Interno Vigente',
+      criterio: newForm.criterio?.trim() || `${newForm.norma_ley_nombre}, ${newForm.articulo}`,
       causa: newForm.causa?.trim() || 'Falta de supervisión preventiva.',
       efecto: newForm.efecto?.trim() || 'Impacto potencial al erario público.',
       monto: Number(newForm.monto) || 0,
@@ -138,12 +191,14 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
       conclusion: newForm.conclusion?.trim() || 'Postura pericial forense preliminar.',
       riesgo: (newForm.riesgo as RiskLevel) || 'Medio',
       fusion_id: newForm.fusion_id || 'FUS-01',
-      puntuacion_calidad: Number(newForm.puntuacion_calidad) || 8.5,
-      estado_supervision: (newForm.estado_supervision as SupervisorStatus) || 'Requiere Ajuste',
-      incidencia_supervisor: newForm.incidencia_supervisor?.trim() || 'Revisión técnica en proceso.',
+      puntuacion_calidad: Number(newForm.puntuacion_calidad) || 10.0,
+      estado_supervision: (newForm.estado_supervision as SupervisorStatus) || 'Aprobado (10/10)',
+      estado_validacion: 'Nuevo Agregado',
+      incidencia_supervisor: newForm.incidencia_supervisor?.trim() || 'Registrado por auditor actuante.',
       ajuste_recomendado_supervisor:
-        newForm.ajuste_recomendado_supervisor?.trim() || 'Ajustar redacción para 10/10.',
+        newForm.ajuste_recomendado_supervisor?.trim() || 'Calificación 10/10.',
       evidencia_soporte: newForm.evidencia_soporte?.trim() || 'Expediente digital auditado',
+      cadena_custodia: newForm.cadena_custodia?.trim() || `EVID-HASH-${Date.now()}`,
       fecha_registro: new Date().toISOString().slice(0, 10),
       estado: 'Confirmado',
     };
@@ -178,32 +233,39 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
     return (
       <span className="inline-flex items-center gap-1 bg-amber-950/80 border border-amber-500/40 text-amber-300 px-2 py-0.5 rounded-full text-[10px] font-bold">
         <AlertCircle className="w-3 h-3 text-amber-400" />
-        <span>{score ? `${score}/10` : ''} Requiere Ajuste</span>
+        <span>Ajuste ({score ?? 8.5}/10)</span>
       </span>
     );
   };
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden mt-6">
-      {/* Table Header & Toolbar */}
-      <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Table Header Section */}
+      <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-950/40">
         <div>
           <div className="flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-blue-400" />
-            <h3 className="text-sm sm:text-base font-bold text-white">
-              Matriz de Hallazgos Extraídos (Hoja 1: Estructura Completa & Evaluación 0-10)
+            <BookOpen className="w-5 h-5 text-blue-400" />
+            <h3 className="text-base font-bold text-white">
+              Matriz de Hallazgos con Trazabilidad Legal de Precisión Judicial
             </h3>
-            <span className="bg-slate-800 text-slate-300 text-xs px-2.5 py-0.5 rounded-full font-mono">
-              {filteredFindings.length} de {findings.length}
+            <span className="bg-slate-800 text-blue-300 border border-slate-700 text-xs px-2.5 py-0.5 rounded-full font-mono font-bold">
+              {filteredFindings.length} de {findings.length} Hallazgos
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Incluye número, página de referencia, condición, criterios, causas, efecto, recomendación,
-            conclusión y dictamen del supervisor
+            Citas normativas exactas (Ley, Artículo, Numeral, Literal), folio de incidencia y fuentes cruzadas de verificación
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleValidateAllFiltered}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow transition"
+            title="Llevar todos los hallazgos visibles a 10/10 aprobados"
+          >
+            <Check className="w-4 h-4 text-emerald-300" />
+            <span>Aprobar Todos (10/10)</span>
+          </button>
           <button
             onClick={() => setIsAddingNew(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition"
@@ -221,7 +283,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por Pág, No., Título o Hecho..."
+            placeholder="Buscar por Ley, Art, Pág, No., Título..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -272,19 +334,17 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
           </select>
         </div>
 
-        {/* Fusion Group Filter */}
+        {/* Validation Filter */}
         <div>
           <select
-            value={selectedFusion}
-            onChange={(e) => setSelectedFusion(e.target.value)}
+            value={selectedValidation}
+            onChange={(e) => setSelectedValidation(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
-            <option value="ALL">🔗 Todas las Fusiones</option>
-            {rules.map((rule) => (
-              <option key={rule.fusion_id} value={rule.fusion_id}>
-                {rule.fusion_id} - {rule.rubro.slice(0, 20)}...
-              </option>
-            ))}
+            <option value="ALL">🔍 Estado Validación Auditor</option>
+            <option value="Validado por Auditor">Validado por Auditor</option>
+            <option value="Nuevo Agregado">Nuevo Agregado</option>
+            <option value="Descartado">Descartado</option>
           </select>
         </div>
       </div>
@@ -294,30 +354,33 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
-              <th className="py-3 px-3 w-28">Ref. / Página</th>
-              <th className="py-3 px-3 w-40">Rubro / Área</th>
-              <th className="py-3 px-3 min-w-[280px]">Título y Condición Observada</th>
+              <th className="py-3 px-3 w-28">Ref. / Folio</th>
+              <th className="py-3 px-3 w-36">Rubro / Área</th>
+              <th className="py-3 px-3 min-w-[260px]">Título y Condición Observada</th>
+              <th className="py-3 px-3 min-w-[210px]">Trazabilidad Normativa (Ley, Art, Num, Lit)</th>
               <th className="py-3 px-3 w-32 text-right">Monto ({currency})</th>
-              <th className="py-3 px-3 w-24 text-center">Riesgo</th>
-              <th className="py-3 px-3 w-36 text-center">Control Calidad Supervisor</th>
-              <th className="py-3 px-3 min-w-[240px]">Debilidad & Ajuste IA para 10/10</th>
-              <th className="py-3 px-3 w-20 text-center">Fusión</th>
-              <th className="py-3 px-3 w-24 text-center">Acciones</th>
+              <th className="py-3 px-3 w-28 text-center">Calidad 0-10</th>
+              <th className="py-3 px-3 w-28 text-center">Validación</th>
+              <th className="py-3 px-3 w-32 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {filteredFindings.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-slate-500">
+                <td colSpan={8} className="py-8 text-center text-slate-500">
                   No se encontraron hallazgos con los criterios seleccionados.
                 </td>
               </tr>
             ) : (
               filteredFindings.map((finding) => {
+                const isDiscarded = finding.estado_validacion === 'Descartado';
+
                 return (
                   <tr
                     key={finding.id}
-                    className="hover:bg-slate-800/40 transition group text-slate-300"
+                    className={`hover:bg-slate-800/40 transition group text-slate-300 ${
+                      isDiscarded ? 'opacity-40 bg-slate-950/40 line-through' : ''
+                    }`}
                   >
                     {/* Ref & Pag */}
                     <td className="py-3 px-3">
@@ -325,13 +388,21 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                         No. {finding.numero_hallazgo || finding.id}
                       </span>
                       <span className="text-[10px] text-slate-400 block font-medium">
-                        {finding.pagina_referencia || 'Pág. No indicada'}
+                        {finding.pagina_referencia || 'Pág. General'}
                       </span>
+                      {finding.punto_incidencia && (
+                        <span className="text-[9px] text-purple-300 block font-semibold truncate max-w-[110px]" title={finding.punto_incidencia}>
+                          {finding.punto_incidencia}
+                        </span>
+                      )}
                     </td>
 
                     {/* Rubro */}
                     <td className="py-3 px-3 font-semibold text-slate-200">
                       <span className="line-clamp-2">{finding.rubro}</span>
+                      <span className="text-[10px] font-mono text-indigo-400 block mt-0.5">
+                        {finding.fusion_id}
+                      </span>
                     </td>
 
                     {/* Titulo y Condicion */}
@@ -343,11 +414,28 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                         <strong className="text-slate-400">Condición: </strong>
                         {finding.condicion}
                       </p>
-                      {finding.criterio && (
-                        <p className="text-[10px] text-amber-300/90 mt-0.5 line-clamp-1">
-                          <strong>Criterio: </strong>
-                          {finding.criterio}
-                        </p>
+                    </td>
+
+                    {/* Trazabilidad Normativa Exacta */}
+                    <td className="py-3 px-3 text-[11px]">
+                      <strong className="text-purple-300 block line-clamp-1" title={finding.norma_ley_nombre || finding.criterio}>
+                        {finding.norma_ley_nombre || finding.criterio}
+                      </strong>
+                      <div className="flex flex-wrap gap-1 text-[10px] text-slate-300 mt-0.5">
+                        <span className="bg-slate-800 px-1.5 py-0.2 rounded">
+                          {finding.articulo || 'Art. de Ley'}
+                        </span>
+                        <span className="bg-slate-800 px-1.5 py-0.2 rounded text-amber-300">
+                          {finding.numeral || 'Num. N/A'}
+                        </span>
+                        <span className="bg-slate-800 px-1.5 py-0.2 rounded text-emerald-300">
+                          {finding.literal || 'Lit. N/A'}
+                        </span>
+                      </div>
+                      {finding.fuente_cruzada && (
+                        <span className="text-[9.5px] text-slate-400 block truncate mt-0.5" title={finding.fuente_cruzada}>
+                          Cruce: {finding.fuente_cruzada}
+                        </span>
                       )}
                     </td>
 
@@ -356,18 +444,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                       {formatCurrency(finding.monto, currency)}
                     </td>
 
-                    {/* Riesgo */}
-                    <td className="py-3 px-3 text-center">
-                      <span
-                        className={`inline-block border px-2 py-0.5 rounded-full text-[10px] font-semibold ${getRiskBadge(
-                          finding.riesgo
-                        )}`}
-                      >
-                        {finding.riesgo}
-                      </span>
-                    </td>
-
-                    {/* Control Calidad Supervisor */}
+                    {/* Calidad 0-10 */}
                     <td className="py-3 px-3 text-center">
                       {getSupervisionBadge(
                         finding.estado_supervision || 'Aprobado (10/10)',
@@ -375,62 +452,51 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                       )}
                     </td>
 
-                    {/* Debilidad & Ajuste IA */}
-                    <td className="py-3 px-3 text-[11px] leading-relaxed">
-                      {finding.estado_supervision === 'Aprobado (10/10)' ? (
-                        <span className="text-emerald-400 text-[10px] font-semibold">
-                          Punto conforme con normas Cámara de Cuentas / CGR. Sin debilidades.
-                        </span>
-                      ) : (
-                        <div>
-                          <p className="text-amber-300/90 line-clamp-2">
-                            <strong>Incidencia: </strong>
-                            {finding.incidencia_supervisor}
-                          </p>
-                          <p className="text-blue-300/90 line-clamp-2 mt-0.5 font-medium">
-                            <strong>Ajuste IA 10/10: </strong>
-                            {finding.ajuste_recomendado_supervisor}
-                          </p>
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Fusión */}
+                    {/* Validacion Status */}
                     <td className="py-3 px-3 text-center">
-                      <span className="inline-block bg-indigo-950/80 border border-indigo-700/60 text-indigo-300 px-2 py-0.5 rounded font-mono text-[11px] font-bold">
-                        {finding.fusion_id}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                        finding.estado_validacion === 'Descartado'
+                          ? 'bg-rose-950/60 text-rose-300 border-rose-800/50'
+                          : finding.estado_validacion === 'Nuevo Agregado'
+                          ? 'bg-cyan-950/60 text-cyan-300 border-cyan-800/50'
+                          : 'bg-emerald-950/60 text-emerald-300 border-emerald-800/50'
+                      }`}>
+                        {finding.estado_validacion || 'Validado por Auditor'}
                       </span>
                     </td>
 
                     {/* Acciones */}
                     <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleQuickValidate(finding)}
+                          className="p-1 rounded bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white transition"
+                          title="Validar y llevar a 10/10"
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        </button>
                         <button
                           onClick={() => setViewingFinding(finding)}
-                          className="p-1.5 rounded hover:bg-slate-700 text-blue-400 hover:text-blue-300"
+                          className="p-1 rounded bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition"
                           title="Ver Cédula Completa"
                         >
-                          <Maximize2 className="w-3.5 h-3.5" />
+                          <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
                         </button>
                         <button
                           onClick={() => handleStartEdit(finding)}
-                          className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white"
-                          title="Editar en pantalla"
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                          title="Editar Cédula y Citas Legales"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => {
-                            if (
-                              window.confirm(
-                                `¿Confirma eliminar el hallazgo No. ${finding.numero_hallazgo}: "${finding.titulo}"?`
-                              )
-                            ) {
+                            if (window.confirm(`¿Desea descartar o eliminar el hallazgo No. ${finding.numero_hallazgo}?`)) {
                               onDeleteFinding(finding.id);
                             }
                           }}
-                          className="p-1.5 rounded hover:bg-rose-900/40 text-slate-400 hover:text-rose-400"
-                          title="Borrar hallazgo"
+                          className="p-1 rounded bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 transition"
+                          title="Eliminar o descartar hallazgo"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -447,7 +513,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
       {/* MODAL 1: Ver Cédula Completa */}
       {viewingFinding && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setViewingFinding(null)}
               className="absolute right-4 top-4 text-slate-400 hover:text-white"
@@ -475,39 +541,70 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
             <div className="space-y-3.5 text-xs">
               <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5">
                 <strong className="text-blue-300 block mb-1">
-                  1. Condición Observada (Hechos Completos Extraídos):
+                  1. Condición Observada (Hechos Reales Extraídos):
                 </strong>
                 <p className="text-slate-200 leading-relaxed">{viewingFinding.condicion}</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
-                  <strong className="text-amber-300 block mb-1">2. Criterios Legales / Normas:</strong>
-                  <p className="text-slate-300">{viewingFinding.criterio}</p>
+              {/* Legal Reference Precision Box */}
+              <div className="bg-purple-950/30 border border-purple-800/40 rounded-xl p-3.5 space-y-2">
+                <strong className="text-purple-300 block flex items-center gap-1.5">
+                  <Scale className="w-4 h-4 text-purple-400" />
+                  2. Fundamentación Legal Exacta y Trazabilidad Judicial:
+                </strong>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-slate-200">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Norma / Ley:</span>
+                    <strong>{viewingFinding.norma_ley_nombre || viewingFinding.criterio}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Artículo:</span>
+                    <strong className="text-amber-300">{viewingFinding.articulo || 'Art. Aplicable'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Numeral:</span>
+                    <strong className="text-cyan-300">{viewingFinding.numeral || 'Numeral Específico'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Literal:</span>
+                    <strong className="text-emerald-300">{viewingFinding.literal || 'Literal Específico'}</strong>
+                  </div>
                 </div>
-                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
-                  <strong className="text-rose-300 block mb-1">3. Causa Raíz:</strong>
-                  <p className="text-slate-300">{viewingFinding.causa}</p>
-                </div>
+                {viewingFinding.fuente_cruzada && (
+                  <div className="pt-1 text-[11px] text-slate-400 border-t border-purple-900/40">
+                    <strong>Fuente Cruzada de Comprobación:</strong> {viewingFinding.fuente_cruzada}
+                  </div>
+                )}
+                {viewingFinding.punto_incidencia && (
+                  <div className="text-[11px] text-purple-300">
+                    <strong>Punto de Incidencia / Folio:</strong> {viewingFinding.punto_incidencia}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
-                  <strong className="text-purple-300 block mb-1">4. Efecto / Impacto:</strong>
+                  <strong className="text-rose-300 block mb-1">3. Causa Raíz:</strong>
+                  <p className="text-slate-300">{viewingFinding.causa}</p>
+                </div>
+                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
+                  <strong className="text-purple-300 block mb-1">4. Efecto / Impacto Patrimonial:</strong>
                   <p className="text-slate-300">{viewingFinding.efecto}</p>
                   <p className="font-mono text-emerald-400 font-bold mt-1">
                     Monto: {formatCurrency(viewingFinding.monto, currency)}
                   </p>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
                   <strong className="text-emerald-300 block mb-1">5. Recomendación del Auditor:</strong>
                   <p className="text-slate-300">{viewingFinding.recomendacion}</p>
                 </div>
-              </div>
-
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
-                <strong className="text-blue-300 block mb-1">6. Conclusión y Postura Forense:</strong>
-                <p className="text-slate-300">{viewingFinding.conclusion}</p>
+                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
+                  <strong className="text-blue-300 block mb-1">6. Conclusión y Postura Forense:</strong>
+                  <p className="text-slate-300">{viewingFinding.conclusion}</p>
+                </div>
               </div>
 
               <div className="bg-blue-950/30 border border-blue-900/50 rounded-xl p-3.5">
@@ -550,7 +647,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
 
             <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-blue-400" />
-              <span>Editar Hallazgo No. {editingFinding.numero_hallazgo} en Pantalla</span>
+              <span>Editar Hallazgo No. {editingFinding.numero_hallazgo} & Citas Legales</span>
             </h3>
 
             <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
@@ -585,18 +682,74 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                 </div>
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">
-                    Monto Observado ({currency})
+                    Punto de Incidencia / Folio
                   </label>
                   <input
-                    type="number"
-                    value={editingFinding.monto}
+                    type="text"
+                    value={editingFinding.punto_incidencia || ''}
                     onChange={(e) =>
-                      setEditingFinding({
-                        ...editingFinding,
-                        monto: parseFloat(e.target.value) || 0,
-                      })
+                      setEditingFinding({ ...editingFinding, punto_incidencia: e.target.value })
                     }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-mono"
+                    placeholder="Ej: Folio 45, Acta No. 2"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-purple-300 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Exact Legal Grounding Inputs */}
+              <div className="bg-purple-950/20 border border-purple-800/40 p-3 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-purple-300 block">
+                  Fundamento Jurídico Exacto (Ley, Artículo, Numeral, Literal):
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-400 font-semibold mb-1">Nombre Formal de la Ley</label>
+                    <input
+                      type="text"
+                      value={editingFinding.norma_ley_nombre || editingFinding.criterio || ''}
+                      onChange={(e) =>
+                        setEditingFinding({ ...editingFinding, norma_ley_nombre: e.target.value, criterio: e.target.value })
+                      }
+                      placeholder="Ej: Ley No. 340-06 de Compras y Contrataciones"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Artículo</label>
+                    <input
+                      type="text"
+                      value={editingFinding.articulo || ''}
+                      onChange={(e) => setEditingFinding({ ...editingFinding, articulo: e.target.value })}
+                      placeholder="Ej: Art. 14"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Numeral y Literal</label>
+                    <input
+                      type="text"
+                      value={editingFinding.numeral ? `${editingFinding.numeral} ${editingFinding.literal || ''}` : ''}
+                      onChange={(e) => {
+                        const parts = e.target.value.split(' ');
+                        setEditingFinding({
+                          ...editingFinding,
+                          numeral: parts[0] || '',
+                          literal: parts.slice(1).join(' ') || '',
+                        });
+                      }}
+                      placeholder="Ej: Numeral 2 Literal b"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Fuente Cruzada de Comprobación</label>
+                  <input
+                    type="text"
+                    value={editingFinding.fuente_cruzada || ''}
+                    onChange={(e) => setEditingFinding({ ...editingFinding, fuente_cruzada: e.target.value })}
+                    placeholder="Ej: Cruce de Nómina SIGEF vs Portal de Transparencia vs Cheques"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200"
                   />
                 </div>
               </div>
@@ -629,156 +782,52 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">
-                    Criterios Legales / Normas
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editingFinding.criterio}
-                    onChange={(e) =>
-                      setEditingFinding({ ...editingFinding, criterio: e.target.value })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Causa Raíz</label>
-                  <textarea
-                    rows={2}
-                    value={editingFinding.causa}
-                    onChange={(e) => setEditingFinding({ ...editingFinding, causa: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Recomendación del Auditor
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editingFinding.recomendacion}
-                    onChange={(e) =>
-                      setEditingFinding({ ...editingFinding, recomendacion: e.target.value })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Conclusión Forense Pericial
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editingFinding.conclusion}
-                    onChange={(e) =>
-                      setEditingFinding({ ...editingFinding, conclusion: e.target.value })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-              </div>
-
-              {/* Evaluación del Supervisor */}
-              <div className="bg-slate-950 border border-blue-900/50 p-3.5 rounded-xl space-y-3">
-                <span className="font-bold text-blue-300 text-xs block">
-                  Control de Calidad del Supervisor (Escala 0 a 10):
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Calificación (0 - 10)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="10"
-                      value={editingFinding.puntuacion_calidad}
-                      onChange={(e) =>
-                        setEditingFinding({
-                          ...editingFinding,
-                          puntuacion_calidad: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Estado de Supervisión
-                    </label>
-                    <select
-                      value={editingFinding.estado_supervision}
-                      onChange={(e) =>
-                        setEditingFinding({
-                          ...editingFinding,
-                          estado_supervision: e.target.value as SupervisorStatus,
-                        })
-                      }
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
-                    >
-                      <option value="Aprobado (10/10)">Aprobado (10/10)</option>
-                      <option value="Requiere Ajuste">Requiere Ajuste</option>
-                      <option value="Fusionado">Fusionado</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Código Fusión
-                    </label>
-                    <select
-                      value={editingFinding.fusion_id}
-                      onChange={(e) =>
-                        setEditingFinding({ ...editingFinding, fusion_id: e.target.value })
-                      }
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
-                    >
-                      {rules.map((r) => (
-                        <option key={r.fusion_id} value={r.fusion_id}>
-                          {r.fusion_id} - {r.rubro.slice(0, 18)}...
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
-                    Debilidad o Incidencia Detectada (Cámara de Cuentas / CGR)
+                    Monto Observado ({currency})
                   </label>
                   <input
-                    type="text"
-                    value={editingFinding.incidencia_supervisor}
+                    type="number"
+                    value={editingFinding.monto}
                     onChange={(e) =>
                       setEditingFinding({
                         ...editingFinding,
-                        incidencia_supervisor: e.target.value,
+                        monto: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-mono"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
-                    Ajuste Recomendado con IA para Elevar a 10/10
-                  </label>
-                  <input
-                    type="text"
-                    value={editingFinding.ajuste_recomendado_supervisor}
+                  <label className="block text-slate-300 font-semibold mb-1">Nivel de Riesgo</label>
+                  <select
+                    value={editingFinding.riesgo}
                     onChange={(e) =>
-                      setEditingFinding({
-                        ...editingFinding,
-                        ajuste_recomendado_supervisor: e.target.value,
-                      })
+                      setEditingFinding({ ...editingFinding, riesgo: e.target.value as RiskLevel })
                     }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-blue-200"
-                  />
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  >
+                    <option value="Bajo">Bajo</option>
+                    <option value="Medio">Medio</option>
+                    <option value="Alto">Alto</option>
+                    <option value="Crítico">Crítico</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Estado Validación</label>
+                  <select
+                    value={editingFinding.estado_validacion || 'Validado por Auditor'}
+                    onChange={(e) =>
+                      setEditingFinding({ ...editingFinding, estado_validacion: e.target.value as any })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  >
+                    <option value="Validado por Auditor">Validado por Auditor</option>
+                    <option value="Requiere Ajuste">Requiere Ajuste</option>
+                    <option value="Descartado">Descartado</option>
+                    <option value="Nuevo Agregado">Nuevo Agregado</option>
+                  </select>
                 </div>
               </div>
 
@@ -816,7 +865,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Plus className="w-5 h-5 text-emerald-400" />
-                <span>Registrar Nuevo Hallazgo con Estructura Forense Completa</span>
+                <span>Registrar Nuevo Hallazgo con Citas Legales Exactas</span>
               </h3>
               <button
                 type="button"
@@ -855,15 +904,70 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                 </div>
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">
-                    Monto Observado ({currency})
+                    Punto de Incidencia / Folio
                   </label>
                   <input
-                    type="number"
-                    value={newForm.monto}
-                    onChange={(e) =>
-                      setNewForm({ ...newForm, monto: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-mono"
+                    type="text"
+                    value={newForm.punto_incidencia || ''}
+                    onChange={(e) => setNewForm({ ...newForm, punto_incidencia: e.target.value })}
+                    placeholder="Ej: Folio 14, Párrafo 2"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-purple-300 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Exact Legal Grounding Inputs */}
+              <div className="bg-purple-950/20 border border-purple-800/40 p-3 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-purple-300 block">
+                  Cita Normativa de Precisión Judicial:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-400 font-semibold mb-1">Nombre Formal de la Ley</label>
+                    <input
+                      type="text"
+                      value={newForm.norma_ley_nombre || ''}
+                      onChange={(e) => setNewForm({ ...newForm, norma_ley_nombre: e.target.value, criterio: e.target.value })}
+                      placeholder="Ej: Ley No. 340-06 sobre Compras y Contrataciones"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Artículo</label>
+                    <input
+                      type="text"
+                      value={newForm.articulo || ''}
+                      onChange={(e) => setNewForm({ ...newForm, articulo: e.target.value })}
+                      placeholder="Ej: Art. 14"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Numeral y Literal</label>
+                    <input
+                      type="text"
+                      value={newForm.numeral ? `${newForm.numeral} ${newForm.literal || ''}` : ''}
+                      onChange={(e) => {
+                        const parts = e.target.value.split(' ');
+                        setNewForm({
+                          ...newForm,
+                          numeral: parts[0] || '',
+                          literal: parts.slice(1).join(' ') || '',
+                        });
+                      }}
+                      placeholder="Ej: Numeral 2 Literal b"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Fuente Cruzada de Comprobación</label>
+                  <input
+                    type="text"
+                    value={newForm.fuente_cruzada || ''}
+                    onChange={(e) => setNewForm({ ...newForm, fuente_cruzada: e.target.value })}
+                    placeholder="Ej: Cotejo SIGEF vs Nómina Portal Transparencia"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200"
                   />
                 </div>
               </div>
@@ -875,7 +979,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Contratación de servicios de mantenimiento sin cotizaciones"
+                  placeholder="Ej: Pagos no justificados en servicios sin comprobante válido"
                   value={newForm.titulo}
                   onChange={(e) => setNewForm({ ...newForm, titulo: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold"
@@ -896,55 +1000,20 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Criterios Legales / Normativos
-                  </label>
-                  <input
-                    type="text"
-                    value={newForm.criterio}
-                    onChange={(e) => setNewForm({ ...newForm, criterio: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Causa Raíz</label>
-                  <input
-                    type="text"
-                    value={newForm.causa}
-                    onChange={(e) => setNewForm({ ...newForm, causa: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Recomendación del Auditor
-                  </label>
-                  <input
-                    type="text"
-                    value={newForm.recomendacion}
-                    onChange={(e) => setNewForm({ ...newForm, recomendacion: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Conclusión Forense
-                  </label>
-                  <input
-                    type="text"
-                    value={newForm.conclusion}
-                    onChange={(e) => setNewForm({ ...newForm, conclusion: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200"
-                  />
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Monto Observado ({currency})
+                  </label>
+                  <input
+                    type="number"
+                    value={newForm.monto}
+                    onChange={(e) =>
+                      setNewForm({ ...newForm, monto: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-mono"
+                  />
+                </div>
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Nivel de Riesgo</label>
                   <select
@@ -961,28 +1030,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Calificación Inicial (0-10)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="10"
-                    value={newForm.puntuacion_calidad}
-                    onChange={(e) =>
-                      setNewForm({
-                        ...newForm,
-                        puntuacion_calidad: parseFloat(e.target.value) || 8.5,
-                      })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Fusión Asignada
-                  </label>
+                  <label className="block text-slate-300 font-semibold mb-1">Fusión Asignada</label>
                   <select
                     value={newForm.fusion_id}
                     onChange={(e) => setNewForm({ ...newForm, fusion_id: e.target.value })}

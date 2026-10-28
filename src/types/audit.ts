@@ -42,6 +42,16 @@ export interface AuditFinding {
   estado?: 'Borrador' | 'Confirmado' | 'Subsanado';
   auditor_registrador?: string;
   pais_jurisdiccion?: string;
+
+  // Trazabilidad Legal de Precisión Judicial (Ley, Numeral, Literal, Artículo, Punto de Incidencia)
+  punto_incidencia?: string; // Folio, párrafo o ubicación exacta en la fuente
+  norma_ley_nombre?: string; // Nombre formal de la ley/norma aplicada (ej: Ley 340-06)
+  articulo?: string; // Artículo específico (ej: Art. 14)
+  numeral?: string; // Numeral específico (ej: Numeral 2)
+  literal?: string; // Literal específico (ej: Literal b)
+  fuente_cruzada?: string; // Cruce de evidencias (ej: SIGEF vs Portal Transparencia vs Banco)
+  estado_validacion?: 'Validado por Auditor' | 'Requiere Ajuste' | 'Descartado' | 'Pendiente' | 'Nuevo Agregado';
+  cadena_custodia?: string; // Código hash o referencia de custodia de la evidencia
 }
 
 export interface FusionRule {
@@ -80,6 +90,7 @@ export interface InstitutionalConfig {
   securityHash: string;
   firm_name?: string;
   perito_judicial_text?: string;
+  equipo_auditores?: UserAccount[]; // Relación de auditores y peritos actuantes
 }
 
 export interface AuditNotification {
@@ -105,6 +116,12 @@ export interface UserAccount {
   nombre: string;
   email: string;
   rol: UserRole;
+  cargo?: string; // Cargo oficial (ej: Perito Contable Forense)
+  exequatur_cpa?: string; // Exequátur oficial de ley / Colegiatura CPA
+  registro_pericial?: string; // No. Registro Perito Judicial ante el Consejo del Poder Judicial
+  especialidad?: string; // Especialidad técnica (ej: Auditoría Forense y Delitos Económicos)
+  telefono?: string;
+  firma_digital?: string; // Imagen Base64 de firma o trazo de firma digitalizada
   password: string; // Clave sin fecha de vencimiento
   historial_claves: string[]; // Histórico de claves previas
   fecha_creacion: string;
@@ -187,3 +204,25 @@ export interface CountryOption {
   normativa_base: string[];
   locale: string;
 }
+
+export type TransparencyModuleType = 'NOMINA' | 'COMPRAS' | 'PRESUPUESTO' | 'DECLARACIONES';
+
+export interface TransparencyCandidateFinding {
+  id: string;
+  modulo: TransparencyModuleType;
+  titulo: string;
+  condicion: string;
+  criterio: string;
+  norma_ley_nombre: string;
+  articulo: string;
+  numeral: string;
+  literal: string;
+  punto_incidencia: string;
+  fuente_cruzada: string;
+  monto: number;
+  riesgo: RiskLevel;
+  rubro: string;
+  recomendacion: string;
+  cadena_custodia: string;
+}
+

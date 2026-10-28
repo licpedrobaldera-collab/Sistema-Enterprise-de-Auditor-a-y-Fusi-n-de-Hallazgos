@@ -429,6 +429,7 @@ export default function App() {
           onAnalysisComplete={handleAnalysisComplete}
           onLoadPresetCase={handleLoadPresetCase}
           onCleanDatabase={handleCleanDatabase}
+          onAddFinding={handleAddFinding}
           isAnalyzing={isAnalyzing}
           setIsAnalyzing={setIsAnalyzing}
         />
@@ -561,7 +562,9 @@ export default function App() {
         dictamen={dictamen}
         findings={findings}
         config={config}
+        users={users}
         onUpdateDictamen={(d) => setDictamen(d)}
+        onUpdateUsers={(updated) => setUsers(updated)}
         onNotify={addNotification}
       />
 
@@ -582,6 +585,8 @@ export default function App() {
         config={config}
         findings={findings}
         rules={rules}
+        users={users}
+        onUpdateUsers={(updated) => setUsers(updated)}
         onExport={handleTriggerExport}
       />
 
