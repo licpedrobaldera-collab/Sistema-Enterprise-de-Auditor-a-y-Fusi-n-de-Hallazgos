@@ -2,6 +2,8 @@ export type RiskLevel = 'Bajo' | 'Medio' | 'Alto' | 'Crítico';
 
 export type SupervisorStatus = 'Aprobado (10/10)' | 'Requiere Ajuste' | 'Fusionado' | 'Pendiente';
 
+export type ClassificationType = 'Debilidad de Control Interno' | 'Hallazgo de Auditoría';
+
 export type UserRole = 
   | 'MASTER_ADMIN'
   | 'SUPERVISOR_CALIDAD'
@@ -11,11 +13,15 @@ export type UserRole =
 
 export interface AuditFinding {
   id: number;
-  numero_hallazgo: string; // Ej: "3.1.01", "2.1.04"
-  pagina_referencia: string; // Ej: "Pág. 10", "Pág. 45 - Acta No. 04"
+  numero_hallazgo: string; // Ej: "3.01", "3.02", ..., "3.54"
+  pagina_referencia: string; // Ej: "Pág. 1 - Acta CCRD", "Pág. 4, Anexo 1"
   titulo: string;
   rubro: string;
   condicion: string; // Condición observada completa (hechos objetivos)
+  clasificacion_tipo: ClassificationType; // 'Debilidad de Control Interno' | 'Hallazgo de Auditoría'
+  marco_normativo?: string; // Marco legal o normativo aplicable (Ley 340-06, NOBACI, etc.)
+  analisis_pericial?: string; // Análisis técnico-pericial y valoración de impacto
+  posible_fusion?: string; // Posible fusión de hallazgos afines por marco normativo y causa
   criterio: string; // Criterios legales y normativos (Ley 10-07, Ley 41-08, etc.)
   causa: string; // Causa raíz detectada
   efecto: string; // Efecto / Impacto operativo y financiero

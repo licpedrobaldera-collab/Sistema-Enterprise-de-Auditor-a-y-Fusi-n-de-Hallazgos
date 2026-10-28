@@ -32,23 +32,26 @@ export function exportToExcel(
 ) {
   const wb = XLSX.utils.book_new();
 
-  // HOJA 1: Extracción Completa de Todos los Hallazgos Originales
+  // HOJA 1: Extracción Completa de Todos los Hallazgos Originales (3.01 - 3.54)
   const ws1Data: any[][] = [
     [config.entity_name.toUpperCase()],
-    [`OFICINA DE AUDITORÍA FORENSE & CONTROL DE CALIDAD`],
-    [`MATRIZ DETALLADA DE EXTRACCIÓN COMPLETA DE HALLAZGOS`],
+    [`OFICINA DE AUDITORÍA FORENSE & CONTROL DE CALIDAD - REPÚBLICA DOMINICANA & ESTÁNDARES INTOSAI`],
+    [`MATRIZ COMPLETA DE HALLAZGOS Y DEBILIDADES DE CONTROL (3.01 - 3.54)`],
     [`AUDITORÍA: ${config.audit_type.toUpperCase()} | PERÍODO: ${config.audit_period}`],
     [],
     [
       'ID',
-      'No. Hallazgo',
+      'No. Hallazgo (3.01 - 3.54)',
       'Ref. Página / Fuente',
-      'Rubro / Área Auditada',
       'Título del Hallazgo',
-      'Condición Observada (Hechos Completos Extraídos)',
+      'Descripción o Condición (Hechos Extraídos)',
+      'Clasificación (Debilidad de Control vs Hallazgo)',
+      'Marco Normativo (Leyes y Normas Aplicables)',
+      'Análisis Pericial Forense',
+      'Posible Fusión de Hallazgo',
       'Criterios Legales y Normativos',
       'Causa Raíz',
-      'Efecto / Impacto',
+      'Efecto / Impacto Operativo y Financiero',
       `Monto Involucrado (${config.currency})`,
       'Recomendación del Auditor',
       'Conclusión Forense',
@@ -65,11 +68,14 @@ export function exportToExcel(
   findings.forEach((f) => {
     ws1Data.push([
       f.id,
-      f.numero_hallazgo || `H-${f.id}`,
+      f.numero_hallazgo || (f.id < 10 ? `3.0${f.id}` : `3.${f.id}`),
       f.pagina_referencia || 'Pág. No Especificada',
-      f.rubro,
       f.titulo,
       f.condicion,
+      f.clasificacion_tipo || (f.monto > 0 ? 'Hallazgo de Auditoría' : 'Debilidad de Control Interno'),
+      f.marco_normativo || f.criterio,
+      f.analisis_pericial || 'Análisis técnico pericial sustentado en la evidencia documental examinada.',
+      f.posible_fusion || 'Sin propuesta de fusión registrada.',
       f.criterio,
       f.causa,
       f.efecto,
@@ -90,25 +96,28 @@ export function exportToExcel(
 
   // Column widths for sheet 1
   ws1['!cols'] = [
-    { wch: 6 },
-    { wch: 14 },
-    { wch: 28 },
-    { wch: 28 },
-    { wch: 40 },
-    { wch: 65 },
-    { wch: 45 },
-    { wch: 40 },
-    { wch: 40 },
-    { wch: 22 },
-    { wch: 45 },
-    { wch: 40 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 22 },
-    { wch: 45 },
-    { wch: 50 },
-    { wch: 16 },
-    { wch: 30 },
+    { wch: 6 },  // ID
+    { wch: 14 }, // No. Hallazgo
+    { wch: 28 }, // Pág Ref
+    { wch: 40 }, // Título
+    { wch: 65 }, // Condición
+    { wch: 30 }, // Clasificación
+    { wch: 45 }, // Marco Normativo
+    { wch: 55 }, // Análisis Pericial
+    { wch: 55 }, // Posible Fusión
+    { wch: 45 }, // Criterio
+    { wch: 40 }, // Causa
+    { wch: 40 }, // Efecto
+    { wch: 22 }, // Monto
+    { wch: 45 }, // Recomendación
+    { wch: 40 }, // Conclusión
+    { wch: 14 }, // Riesgo
+    { wch: 16 }, // Calidad
+    { wch: 22 }, // Supervisión
+    { wch: 45 }, // Incidencia
+    { wch: 50 }, // Ajuste IA
+    { wch: 16 }, // Código Fusión
+    { wch: 30 }, // Evidencia
   ];
 
   XLSX.utils.book_append_sheet(wb, ws1, 'Matriz Hallazgos Completos');
@@ -722,11 +731,15 @@ export function exportToCSV(
 ) {
   const headers = [
     'ID',
-    'Numero_Hallazgo',
+    'No_Hallazgo_301_354',
     'Pagina_Referencia',
-    'Rubro',
     'Titulo',
     'Condicion_Observada',
+    'Clasificacion_Tipo',
+    'Marco_Normativo',
+    'Analisis_Pericial',
+    'Posible_Fusion',
+    'Rubro',
     'Criterio_Legal',
     'Causa_Raiz',
     'Efecto_Impacto',
@@ -747,9 +760,13 @@ export function exportToCSV(
     f.id,
     `"${(f.numero_hallazgo || '').replace(/"/g, '""')}"`,
     `"${(f.pagina_referencia || '').replace(/"/g, '""')}"`,
-    `"${(f.rubro || '').replace(/"/g, '""')}"`,
     `"${(f.titulo || '').replace(/"/g, '""')}"`,
     `"${(f.condicion || '').replace(/"/g, '""')}"`,
+    `"${(f.clasificacion_tipo || (f.monto > 0 ? 'Hallazgo de Auditoría' : 'Debilidad de Control Interno')).replace(/"/g, '""')}"`,
+    `"${(f.marco_normativo || f.criterio || '').replace(/"/g, '""')}"`,
+    `"${(f.analisis_pericial || '').replace(/"/g, '""')}"`,
+    `"${(f.posible_fusion || '').replace(/"/g, '""')}"`,
+    `"${(f.rubro || '').replace(/"/g, '""')}"`,
     `"${(f.criterio || '').replace(/"/g, '""')}"`,
     `"${(f.causa || '').replace(/"/g, '""')}"`,
     `"${(f.efecto || '').replace(/"/g, '""')}"`,
