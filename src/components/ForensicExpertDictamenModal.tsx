@@ -37,7 +37,10 @@ import {
   Link2,
   Search,
   Check,
-  ExternalLink
+  ExternalLink,
+  Sliders,
+  Settings,
+  Percent
 } from 'lucide-react';
 import { 
   ExpertDictamen, 
@@ -45,6 +48,7 @@ import {
   AuditFinding, 
   UserAccount,
   FraudTriangleFinding,
+  FraudTriangleWeights,
   FindingEvidenceEvaluation,
   ForensicEvidenceCriterion,
   EvidenceFileSupport
@@ -113,6 +117,19 @@ const DEFAULT_MP_CRITERIA_TEMPLATE: ForensicEvidenceCriterion[] = [
   },
 ];
 
+export const DEFAULT_FRAUD_WEIGHTS: FraudTriangleWeights = {
+  peso_presion: 30, // 30%
+  peso_oportunidad: 50, // 50% - Prioridad de control interno NOBACI / CGR
+  peso_racionalizacion: 20, // 20%
+  estandar_nombre: 'Enfoque Control Interno NOBACI (CGR / Cámara de Cuentas)',
+  umbral_critico: 4.2,
+  umbral_muy_alto: 3.5,
+  umbral_alto: 2.8,
+  umbral_medio: 2.0,
+  modificado_por: 'Administrador / Perito',
+  fecha_modificacion: new Date().toISOString().slice(0, 10),
+};
+
 export const ForensicExpertDictamenModal: React.FC<ForensicExpertDictamenModalProps> = ({
   isOpen,
   onClose,
@@ -128,6 +145,23 @@ export const ForensicExpertDictamenModal: React.FC<ForensicExpertDictamenModalPr
   const [selectedFindingId, setSelectedFindingId] = useState<number>(findings.length > 0 ? findings[0].id : 1);
   const [signatureTargetUserId, setSignatureTargetUserId] = useState<string | null>(null);
   const [triangleSearchQuery, setTriangleSearchQuery] = useState('');
+
+  // Advanced Fraud Triangle Weights Configuration State
+  const [isConfiguringWeights, setIsConfiguringWeights] = useState(false);
+  const [weightsConfig, setWeightsConfig] = useState<FraudTriangleWeights>(
+    dictamen.pesos_triangulo_fraude || DEFAULT_FRAUD_WEIGHTS
+  );
+  const [tempWeights, setTempWeights] = useState<FraudTriangleWeights>(
+    dictamen.pesos_triangulo_fraude || DEFAULT_FRAUD_WEIGHTS
+  );
+
+  // Sync weights when dictamen changes
+  useEffect(() => {
+    if (dictamen.pesos_triangulo_fraude) {
+      setWeightsConfig(dictamen.pesos_triangulo_fraude);
+      setTempWeights(dictamen.pesos_triangulo_fraude);
+    }
+  }, [dictamen.pesos_triangulo_fraude]);
 
   // AI loading states
   const [isValidatingAI, setIsValidatingAI] = useState(false);
@@ -323,14 +357,70 @@ export const ForensicExpertDictamenModal: React.FC<ForensicExpertDictamenModalPr
     onNotify('Triángulo del Fraude Actualizado', `Evaluación guardada para el Hallazgo #${updated.numero_hallazgo}.`, 'success');
   };
 
-  // Calculate global risk based on Donald Cressey 3 vertices
+  // Calculate weighted score (1.00 to 5.00) and risk category based on customizable institutional weights
+  const calculateWeightedScore = (
+    p: number, 
+    o: number, 
+    r: number, 
+    weights: FraudTriangleWeights = weightsConfig
+  ): { scorePonderado: number; riesgo: 'Bajo' | 'Medio' | 'Alto' | 'Muy Alto' | 'Crítico' } => {
+    const totalWeights = (weights.peso_presion + weights.peso_oportunidad + weights.peso_racionalizacion) || 100;
+    const rawScore = (p * weights.peso_presion + o * weights.peso_oportunidad + r * weights.peso_racionalizacion) / totalWeights;
+    const scorePonderado = Number(rawScore.toFixed(2));
+
+    const critico = weights.umbral_critico || 4.2;
+    const muyAlto = weights.umbral_muy_alto || 3.5;
+    const alto = weights.umbral_alto || 2.8;
+    const medio = weights.umbral_medio || 2.0;
+
+    let riesgo: 'Bajo' | 'Medio' | 'Alto' | 'Muy Alto' | 'Crítico' = 'Bajo';
+    if (scorePonderado >= critico || (p === 5 && o === 5)) {
+      riesgo = 'Crítico';
+    } else if (scorePonderado >= muyAlto) {
+      riesgo = 'Muy Alto';
+    } else if (scorePonderado >= alto) {
+      riesgo = 'Alto';
+    } else if (scorePonderado >= medio) {
+      riesgo = 'Medio';
+    } else {
+      riesgo = 'Bajo';
+    }
+
+    return { scorePonderado, riesgo };
+  };
+
+  // Calculate global risk based on Donald Cressey 3 vertices and custom weights
   const computeGlobalRisk = (p: number, o: number, r: number): 'Bajo' | 'Medio' | 'Alto' | 'Muy Alto' | 'Crítico' => {
-    const sum = p + o + r;
-    if (sum >= 14 || (p === 5 && o === 5)) return 'Crítico';
-    if (sum >= 11) return 'Muy Alto';
-    if (sum >= 8) return 'Alto';
-    if (sum >= 6) return 'Medio';
-    return 'Bajo';
+    return calculateWeightedScore(p, o, r, weightsConfig).riesgo;
+  };
+
+  // Handler to save institutional weights configuration and recalculate all findings
+  const handleSaveWeightsConfig = (newWeights: FraudTriangleWeights, applyToAll: boolean = true) => {
+    let updatedTriangles = dictamen.triangulo_fraude ? [...dictamen.triangulo_fraude] : [];
+    if (applyToAll) {
+      updatedTriangles = updatedTriangles.map((t) => {
+        const { scorePonderado, riesgo } = calculateWeightedScore(t.presion_nivel, t.oportunidad_nivel, t.racionalizacion_nivel, newWeights);
+        return {
+          ...t,
+          puntaje_ponderado: scorePonderado,
+          riesgo_fraude_global: riesgo,
+          sustento_tecnico_vinculado: `Evaluación pericial ponderada [${newWeights.estandar_nombre || 'Norma Institucional'}]: Presión ${t.presion_nivel}/5 (${newWeights.peso_presion}%), Oportunidad ${t.oportunidad_nivel}/5 (${newWeights.peso_oportunidad}%), Racionalización ${t.racionalizacion_nivel}/5 (${newWeights.peso_racionalizacion}%). Puntaje Ponderado: ${scorePonderado}/5.00 [${riesgo}].`
+        };
+      });
+    }
+
+    setWeightsConfig(newWeights);
+    onUpdateDictamen({
+      ...dictamen,
+      pesos_triangulo_fraude: newWeights,
+      triangulo_fraude: updatedTriangles,
+    });
+    setIsConfiguringWeights(false);
+    onNotify(
+      'Parámetros Institucionales Guardados',
+      `Pesos actualizados: ${newWeights.peso_presion}% Presión, ${newWeights.peso_oportunidad}% Oportunidad, ${newWeights.peso_racionalizacion}% Racionalización (${newWeights.estandar_nombre}).`,
+      'success'
+    );
   };
 
   // Gather all evidence documents loaded in the system (per finding and audit case)
@@ -375,19 +465,20 @@ export const ForensicExpertDictamenModal: React.FC<ForensicExpertDictamenModalPr
     return list;
   }, [dictamen.evaluaciones_evidencias, activeEvidence, activeFinding]);
 
-  // Handler to set vertex score (1-5) and auto-recalculate risk
+  // Handler to set vertex score (1-5) and auto-recalculate weighted risk
   const handleSetVertexScore = (vertex: 'presion' | 'oportunidad' | 'racionalizacion', score: number) => {
     if (!activeTriangle) return;
     const p = vertex === 'presion' ? score : activeTriangle.presion_nivel;
     const o = vertex === 'oportunidad' ? score : activeTriangle.oportunidad_nivel;
     const r = vertex === 'racionalizacion' ? score : activeTriangle.racionalizacion_nivel;
-    const globalRisk = computeGlobalRisk(p, o, r);
+    const { scorePonderado, riesgo } = calculateWeightedScore(p, o, r, weightsConfig);
 
     const updated: FraudTriangleFinding = {
       ...activeTriangle,
       [`${vertex}_nivel`]: score,
-      riesgo_fraude_global: globalRisk,
-      sustento_tecnico_vinculado: `Convergencia demostrada de los 3 factores del fraude: Presión (${p}/5), Oportunidad (${o}/5) y Racionalización (${r}/5). Riesgo global clasificado en nivel ${globalRisk} con afectación cuantificada en ${config.currency_symbol} ${(activeFinding?.monto || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 })}.`,
+      puntaje_ponderado: scorePonderado,
+      riesgo_fraude_global: riesgo,
+      sustento_tecnico_vinculado: `Convergencia demostrada de los 3 factores del fraude [${weightsConfig.estandar_nombre || 'Normativa Institucional'}]: Presión (${p}/5, ${weightsConfig.peso_presion}%), Oportunidad (${o}/5, ${weightsConfig.peso_oportunidad}%) y Racionalización (${r}/5, ${weightsConfig.peso_racionalizacion}%). Puntaje ponderado: ${scorePonderado}/5.00 clasificado en nivel ${riesgo} con afectación cuantificada en ${config.currency_symbol} ${(activeFinding?.monto || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 })}.`,
     };
     handleUpdateTriangle(updated);
   };
@@ -786,24 +877,33 @@ Fuente Cruzada: ${f.fuente_cruzada || 'Cotejo contra registros oficiales'}
 Estado de Validación: ${f.estado_supervision || 'Aprobado'}
 ----------------------------------------------------------------------------------------------------`).join('\n')}
 
-IV. ANÁLISIS DEL TRIÁNGULO DEL FRAUDE (DONALD CRESSEY - ISSAI 5000 / NIA 240)
-${(dictamen.triangulo_fraude || []).map((t, idx) => `
-[HALLAZGO #${t.numero_hallazgo}] ${t.titulo}
-- VÉRTICE 1: PRESIÓN / INCENTIVO (${t.presion_nivel}/5):
+IV. ANÁLISIS DEL TRIÁNGULO DEL FRAUDE (DONALD CRESSEY - ISSAI 5000 / NIA 240 / MODELO PONDERADO)
+Parámetros de Ponderación Institucional Aplicados:
+- Estándar / Metodología: ${weightsConfig.estandar_nombre || 'Enfoque NOBACI / CGR'}
+- Distribución de Pesos: Presión (${weightsConfig.peso_presion}%) | Oportunidad (${weightsConfig.peso_oportunidad}%) | Racionalización (${weightsConfig.peso_racionalizacion}%)
+- Umbrales de Riesgo: Crítico (≥${weightsConfig.umbral_critico}) | Muy Alto (≥${weightsConfig.umbral_muy_alto}) | Alto (≥${weightsConfig.umbral_alto}) | Medio (≥${weightsConfig.umbral_medio})
+- Aprobado por: ${weightsConfig.modificado_por || 'Administrador'} [${weightsConfig.fecha_modificacion ? new Date(weightsConfig.fecha_modificacion).toLocaleDateString('es-DO') : 'Vigente'}]
+
+${(dictamen.triangulo_fraude || []).map((t, idx) => {
+  const wScore = (t.puntaje_ponderado ?? calculateWeightedScore(t.presion_nivel, t.oportunidad_nivel, t.racionalizacion_nivel, weightsConfig).scorePonderado).toFixed(2);
+  return `[HALLAZGO #${t.numero_hallazgo}] ${t.titulo}
+- VÉRTICE 1: PRESIÓN / INCENTIVO (${t.presion_nivel}/5 - Peso: ${weightsConfig.peso_presion}%):
   Motivo: ${t.presion_motivo}
   Evidencia Vinculada: ${t.presion_evidencia_ref}
   ${t.presion_documentos?.length ? `Soportes Digitales Vinculados: ${t.presion_documentos.join(', ')}` : ''}
-- VÉRTICE 2: OPORTUNIDAD PERCIBIDA (${t.oportunidad_nivel}/5):
+- VÉRTICE 2: OPORTUNIDAD PERCIBIDA (${t.oportunidad_nivel}/5 - Peso: ${weightsConfig.peso_oportunidad}%):
   Falla de Control: ${t.oportunidad_motivo}
   Evidencia Vinculada: ${t.oportunidad_evidencia_ref}
   ${t.oportunidad_documentos?.length ? `Soportes Digitales Vinculados: ${t.oportunidad_documentos.join(', ')}` : ''}
-- VÉRTICE 3: RACIONALIZACIÓN / JUSTIFICACIÓN (${t.racionalizacion_nivel}/5):
+- VÉRTICE 3: RACIONALIZACIÓN / JUSTIFICACIÓN (${t.racionalizacion_nivel}/5 - Peso: ${weightsConfig.peso_racionalizacion}%):
   Justificación Moral: ${t.racionalizacion_motivo}
   Evidencia Vinculada: ${t.racionalizacion_evidencia_ref}
   ${t.racionalizacion_documentos?.length ? `Soportes Digitales Vinculados: ${t.racionalizacion_documentos.join(', ')}` : ''}
+- PUNTAJE PONDERADO INSTITUCIONAL: ${wScore} / 5.00 (Suma Cressey Base: ${t.presion_nivel + t.oportunidad_nivel + t.racionalizacion_nivel}/15)
 - RIESGO GLOBAL DE FRAUDE: ${t.riesgo_fraude_global}
 - SÍNTESIS PERICIAL: ${t.sustento_tecnico_vinculado}
-----------------------------------------------------------------------------------------------------`).join('\n')}
+----------------------------------------------------------------------------------------------------`;
+}).join('\n')}
 
 V. VERIFICACIÓN DE EVIDENCIAS Y CHECKLIST EXIGIBLE DEL MINISTERIO PÚBLICO (1 AL 5)
 ${(dictamen.evaluaciones_evidencias || []).map((e, idx) => `
@@ -1019,6 +1119,23 @@ ${actingTeam.map((u) => `
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={() => {
+                            setTempWeights(weightsConfig);
+                            setIsConfiguringWeights(!isConfiguringWeights);
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md transition border ${
+                            isConfiguringWeights
+                              ? 'bg-purple-600 text-white border-purple-400 ring-2 ring-purple-400/50'
+                              : 'bg-slate-900 hover:bg-slate-850 text-purple-300 border-purple-500/40'
+                          }`}
+                          title="Definir ponderación personalizada de los vértices (Presión, Oportunidad, Racionalización)"
+                        >
+                          <Sliders className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Ponderación ({weightsConfig.peso_presion}% P / {weightsConfig.peso_oportunidad}% O / {weightsConfig.peso_racionalizacion}% R)</span>
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={handleAnalyzeTriangleAI}
                           disabled={isAnalyzingTriangleAI}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg text-xs font-bold shadow-md transition"
@@ -1028,6 +1145,303 @@ ${actingTeam.map((u) => `
                         </button>
                       </div>
                     </div>
+
+                    {/* CONFIGURACIÓN AVANZADA DE PARÁMETROS DE PONDERACIÓN */}
+                    {isConfiguringWeights && (
+                      <div className="bg-gradient-to-b from-purple-950/40 via-slate-900 to-slate-950 p-4 sm:p-5 rounded-2xl border-2 border-purple-500/50 shadow-2xl space-y-4 animate-in fade-in duration-200">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-purple-500/30">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                              <Sliders className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                Configuración Avanzada de Ponderaciones del Triángulo del Fraude
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                  Parámetros de la Entidad
+                                </span>
+                              </h4>
+                              <p className="text-xs text-slate-400">
+                                Defina los pesos porcentuales para cada vértice según las políticas de control interno y auditoría de {config.entity_name}.
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsConfiguringWeights(false)}
+                            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Selector de Estándares Predefinidos */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block">
+                            Estándares y Políticas de Auditoría Predefinidas:
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                            {[
+                              {
+                                id: 'cgr',
+                                name: 'Enfoque Control Interno NOBACI (CGR / Cámara de Cuentas)',
+                                p: 30, o: 50, r: 20,
+                                desc: 'Prioriza fallas de control previo y segregación (50% Oportunidad)'
+                              },
+                              {
+                                id: 'mp',
+                                name: 'Enfoque Penal Económico (Ministerio Público)',
+                                p: 40, o: 35, r: 25,
+                                desc: 'Prioriza intencionalidad, dolo y desvío de fondos (40% Presión)'
+                              },
+                              {
+                                id: 'cressey',
+                                name: 'Estándar Balanceado Donald Cressey (ISSAI / NIA)',
+                                p: 33, o: 33, r: 34,
+                                desc: 'Equilibrio trilateral clásico de criminología financiera'
+                              },
+                              {
+                                id: 'compras',
+                                name: 'Contrataciones y Adquisiciones Críticas',
+                                p: 25, o: 60, r: 15,
+                                desc: 'Enfocado en vulnerabilidades de compras públicas y licitaciones'
+                              },
+                            ].map((preset) => {
+                              const isPresetActive = tempWeights.peso_presion === preset.p &&
+                                tempWeights.peso_oportunidad === preset.o &&
+                                tempWeights.peso_racionalizacion === preset.r;
+                              return (
+                                <button
+                                  key={preset.id}
+                                  type="button"
+                                  onClick={() => setTempWeights({
+                                    ...tempWeights,
+                                    peso_presion: preset.p,
+                                    peso_oportunidad: preset.o,
+                                    peso_racionalizacion: preset.r,
+                                    estandar_nombre: preset.name,
+                                  })}
+                                  className={`p-2.5 rounded-xl text-left border transition ${
+                                    isPresetActive
+                                      ? 'bg-purple-900/40 border-purple-400 ring-2 ring-purple-400/50 text-white'
+                                      : 'bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[11px] font-bold truncate max-w-[170px]">{preset.name.split('(')[0]}</span>
+                                    <span className="text-[10px] font-mono text-purple-300 font-bold">{preset.p}/{preset.o}/{preset.r}</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 leading-tight line-clamp-2">{preset.desc}</p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Sliders de Peso Porcentual por Vértice */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                          {/* Presión */}
+                          <div className="bg-slate-900/80 p-3 rounded-xl border border-rose-500/30 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                                Peso Presión / Incentivo
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-xs font-bold font-mono">
+                                {tempWeights.peso_presion}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              step={5}
+                              value={tempWeights.peso_presion}
+                              onChange={(e) => setTempWeights({
+                                ...tempWeights,
+                                peso_presion: Number(e.target.value),
+                                estandar_nombre: 'Personalizado por la Entidad'
+                              })}
+                              className="w-full accent-rose-500"
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400">
+                              <span>0%</span>
+                              <span>50%</span>
+                              <span>100%</span>
+                            </div>
+                          </div>
+
+                          {/* Oportunidad */}
+                          <div className="bg-slate-900/80 p-3 rounded-xl border border-amber-500/30 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                Peso Oportunidad Percibida
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-bold font-mono">
+                                {tempWeights.peso_oportunidad}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              step={5}
+                              value={tempWeights.peso_oportunidad}
+                              onChange={(e) => setTempWeights({
+                                ...tempWeights,
+                                peso_oportunidad: Number(e.target.value),
+                                estandar_nombre: 'Personalizado por la Entidad'
+                              })}
+                              className="w-full accent-amber-500"
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400">
+                              <span>0%</span>
+                              <span>50%</span>
+                              <span>100%</span>
+                            </div>
+                          </div>
+
+                          {/* Racionalización */}
+                          <div className="bg-slate-900/80 p-3 rounded-xl border border-cyan-500/30 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                                <Brain className="w-3.5 h-3.5 text-cyan-400" />
+                                Peso Racionalización Moral
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-xs font-bold font-mono">
+                                {tempWeights.peso_racionalizacion}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              step={5}
+                              value={tempWeights.peso_racionalizacion}
+                              onChange={(e) => setTempWeights({
+                                ...tempWeights,
+                                peso_racionalizacion: Number(e.target.value),
+                                estandar_nombre: 'Personalizado por la Entidad'
+                              })}
+                              className="w-full accent-cyan-500"
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400">
+                              <span>0%</span>
+                              <span>50%</span>
+                              <span>100%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Sum Indicator & Validation */}
+                        {(() => {
+                          const totalSum = tempWeights.peso_presion + tempWeights.peso_oportunidad + tempWeights.peso_racionalizacion;
+                          const isValid = totalSum === 100;
+                          return (
+                            <div className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs ${
+                              isValid
+                                ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                                : 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                {isValid ? (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                ) : (
+                                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                                )}
+                                <span>
+                                  Suma Total de Ponderaciones: <strong className="font-mono">{totalSum}%</strong>
+                                  {!isValid && ' — Se recomienda ajustar para que la suma sea exactamente 100%.'}
+                                </span>
+                              </div>
+
+                              {!isValid && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const factor = 100 / totalSum;
+                                    const newP = Math.round(tempWeights.peso_presion * factor);
+                                    const newO = Math.round(tempWeights.peso_oportunidad * factor);
+                                    const newR = 100 - newP - newO;
+                                    setTempWeights({
+                                      ...tempWeights,
+                                      peso_presion: newP,
+                                      peso_oportunidad: newO,
+                                      peso_racionalizacion: newR,
+                                      estandar_nombre: 'Personalizado Ajustado (100%)'
+                                    });
+                                  }}
+                                  className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold shadow transition"
+                                >
+                                  Ajustar Automáticamente a 100%
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Umbrales de Calificación Ponderada y Fórmula */}
+                        <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold text-purple-300">
+                              Fórmula de Riesgo Forense Ponderado Aplicada:
+                            </span>
+                            <code className="text-cyan-300 font-mono text-[11px] bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                              Puntaje Ponderado = (P × {tempWeights.peso_presion}% + O × {tempWeights.peso_oportunidad}% + R × {tempWeights.peso_racionalizacion}%) / 100
+                            </code>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] pt-1 border-t border-slate-850">
+                            <div className="p-1.5 bg-slate-900 rounded border border-rose-500/30">
+                              <span className="text-rose-400 font-bold block">Crítico:</span>
+                              <span className="text-slate-300 font-mono">Puntaje ≥ {tempWeights.umbral_critico || 4.2}</span>
+                            </div>
+                            <div className="p-1.5 bg-slate-900 rounded border border-orange-500/30">
+                              <span className="text-orange-400 font-bold block">Muy Alto:</span>
+                              <span className="text-slate-300 font-mono">Puntaje ≥ {tempWeights.umbral_muy_alto || 3.5}</span>
+                            </div>
+                            <div className="p-1.5 bg-slate-900 rounded border border-amber-500/30">
+                              <span className="text-amber-400 font-bold block">Alto:</span>
+                              <span className="text-slate-300 font-mono">Puntaje ≥ {tempWeights.umbral_alto || 2.8}</span>
+                            </div>
+                            <div className="p-1.5 bg-slate-900 rounded border border-emerald-500/30">
+                              <span className="text-emerald-400 font-bold block">Medio / Bajo:</span>
+                              <span className="text-slate-300 font-mono">Puntaje &lt; {tempWeights.umbral_alto || 2.8}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Botones de Acción */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setTempWeights(DEFAULT_FRAUD_WEIGHTS)}
+                            className="text-xs text-slate-400 hover:text-white underline transition"
+                          >
+                            Restablecer a Valores CGR/CCRD por Defecto (30/50/20)
+                          </button>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsConfiguringWeights(false)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveWeightsConfig(tempWeights, true)}
+                              className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg transition flex items-center gap-1.5"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Guardar y Recalcular Todos los Hallazgos ({findings.length})</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Filter & Quick Selector Bar */}
                     <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-850">
@@ -1126,7 +1540,9 @@ ${actingTeam.map((u) => `
                                 <span className="text-amber-400">O:{o}</span>
                                 <span className="text-slate-600">•</span>
                                 <span className="text-cyan-400">R:{r}</span>
-                                <span className="text-slate-400 ml-auto font-bold">({total}/15)</span>
+                                <span className="text-purple-300 ml-auto font-bold" title="Puntaje Ponderado Institucional (1-5)">
+                                  {(tri?.puntaje_ponderado ?? calculateWeightedScore(p, o, r, weightsConfig).scorePonderado).toFixed(1)}/5
+                                </span>
                               </div>
                             </button>
                           );
@@ -1159,35 +1575,108 @@ ${actingTeam.map((u) => `
                           </p>
                         </div>
 
-                        {/* Tri-Gauge Global Risk Summary */}
-                        <div className="flex flex-col items-end gap-2 bg-slate-900/90 p-3 rounded-xl border border-slate-800">
-                          <div className="text-right">
-                            <span className="text-[10px] uppercase font-semibold text-slate-400 block">
-                              Monto Cuantificado en Riesgo:
-                            </span>
-                            <span className="text-base font-bold font-mono text-emerald-400">
-                              {config.currency_symbol} {(activeFinding.monto || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                            </span>
+                        {/* Dynamic SVG Geometric Cressey Triangle + Global Risk Summary */}
+                        <div className="flex flex-wrap items-center gap-4 bg-slate-900/95 p-3 rounded-xl border border-slate-800">
+                          {/* SVG Geometric Cressey Triangle */}
+                          <div className="relative w-24 h-24 flex-shrink-0 flex items-center justify-center bg-slate-950 rounded-lg p-1 border border-slate-800/80">
+                            <svg viewBox="0 0 110 105" className="w-full h-full overflow-visible">
+                              {/* Outer guide triangle */}
+                              <polygon
+                                points="55,14 98,88 12,88"
+                                fill="none"
+                                stroke="#334155"
+                                strokeWidth="1.5"
+                                strokeDasharray="2 2"
+                              />
+                              {/* Median spokes */}
+                              <line x1="55" y1="14" x2="55" y2="60" stroke="#1e293b" strokeWidth="1" />
+                              <line x1="98" y1="88" x2="55" y2="60" stroke="#1e293b" strokeWidth="1" />
+                              <line x1="12" y1="88" x2="55" y2="60" stroke="#1e293b" strokeWidth="1" />
+
+                              {/* Dynamic Morphing Inner Polygon */}
+                              {(() => {
+                                const cx = 55;
+                                const cy = 60;
+                                const pFactor = Math.max(0.2, (activeTriangle.presion_nivel || 1) / 5);
+                                const oFactor = Math.max(0.2, (activeTriangle.oportunidad_nivel || 1) / 5);
+                                const rFactor = Math.max(0.2, (activeTriangle.racionalizacion_nivel || 1) / 5);
+
+                                const px = cx;
+                                const py = cy - pFactor * (cy - 14);
+                                const ox = cx + oFactor * (96 - cx);
+                                const oy = cy + oFactor * (86 - cy);
+                                const rx = cx - rFactor * (cx - 14);
+                                const ry = cy + rFactor * (86 - cy);
+
+                                const polyColor = activeTriangle.riesgo_fraude_global === 'Crítico'
+                                  ? '#f43f5e'
+                                  : activeTriangle.riesgo_fraude_global === 'Muy Alto'
+                                  ? '#fb923c'
+                                  : activeTriangle.riesgo_fraude_global === 'Alto'
+                                  ? '#f59e0b'
+                                  : '#10b981';
+
+                                return (
+                                  <polygon
+                                    points={`${px},${py} ${ox},${oy} ${rx},${ry}`}
+                                    fill={polyColor}
+                                    fillOpacity="0.38"
+                                    stroke={polyColor}
+                                    strokeWidth="2"
+                                  />
+                                );
+                              })()}
+
+                              {/* Vertex Labels */}
+                              <text x="55" y="9" textAnchor="middle" fill="#fb7185" fontSize="8" fontWeight="bold">
+                                P:{activeTriangle.presion_nivel}
+                              </text>
+                              <text x="98" y="98" textAnchor="middle" fill="#fbbf24" fontSize="8" fontWeight="bold">
+                                O:{activeTriangle.oportunidad_nivel}
+                              </text>
+                              <text x="14" y="98" textAnchor="middle" fill="#22d3ee" fontSize="8" fontWeight="bold">
+                                R:{activeTriangle.racionalizacion_nivel}
+                              </text>
+                            </svg>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-end gap-1.5">
                             <div className="text-right">
-                              <span className="text-[10px] text-slate-400 block">Puntaje Cressey Total:</span>
-                              <span className="text-xs font-bold text-white font-mono">
-                                {(activeTriangle.presion_nivel || 0) + (activeTriangle.oportunidad_nivel || 0) + (activeTriangle.racionalizacion_nivel || 0)} / 15
+                              <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                                Monto Cuantificado en Riesgo:
+                              </span>
+                              <span className="text-base font-bold font-mono text-emerald-400">
+                                {config.currency_symbol} {(activeFinding.monto || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
                               </span>
                             </div>
-                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                              activeTriangle.riesgo_fraude_global === 'Crítico'
-                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                                : activeTriangle.riesgo_fraude_global === 'Muy Alto'
-                                ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
-                                : activeTriangle.riesgo_fraude_global === 'Alto'
-                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                            }`}>
-                              Riesgo: {activeTriangle.riesgo_fraude_global}
-                            </span>
+
+                            <div className="flex flex-wrap items-center justify-end gap-2.5">
+                              <div className="text-right bg-slate-950/70 px-2 py-1 rounded-lg border border-purple-500/30">
+                                <span className="text-[9px] uppercase tracking-wider text-purple-300 font-semibold block">
+                                  Puntaje Ponderado:
+                                </span>
+                                <span className="text-xs font-black text-purple-200 font-mono">
+                                  {(activeTriangle.puntaje_ponderado ?? calculateWeightedScore(activeTriangle.presion_nivel, activeTriangle.oportunidad_nivel, activeTriangle.racionalizacion_nivel, weightsConfig).scorePonderado).toFixed(2)} / 5.00
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] text-slate-400 block">Suma Base:</span>
+                                <span className="text-xs font-bold text-slate-300 font-mono">
+                                  {(activeTriangle.presion_nivel || 0) + (activeTriangle.oportunidad_nivel || 0) + (activeTriangle.racionalizacion_nivel || 0)} / 15
+                                </span>
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                                activeTriangle.riesgo_fraude_global === 'Crítico'
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                  : activeTriangle.riesgo_fraude_global === 'Muy Alto'
+                                  ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                                  : activeTriangle.riesgo_fraude_global === 'Alto'
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              }`}>
+                                Riesgo: {activeTriangle.riesgo_fraude_global}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1259,29 +1748,27 @@ ${actingTeam.map((u) => `
                               <label className="text-[11px] text-slate-300 font-semibold">
                                 Motivación o Incentivo Detectado:
                               </label>
-                              <div className="flex items-center gap-1 text-[9px] text-slate-400">
+                            </div>
+                            {/* Predefined Cressey Variables Chips */}
+                            <div className="flex flex-wrap items-center gap-1 text-[9px] mb-1.5">
+                              {[
+                                { label: '+ Déficit de Fondos', text: `Déficit presupuestario y desvío hacia compromisos no registrados en ${config.entity_name}.` },
+                                { label: '+ Apremio de Metas', text: `Apremio financiero de pagos urgentes a proveedores fuera del marco de la Ley de Compras.` },
+                                { label: '+ Deudas Ocultas', text: `Presión por pasivos acumulados y compromisos no devengados formalmente.` },
+                                { label: '+ Coerción Superior', text: `Presión jerárquica para acelerar desembolsos sin los soportes reglamentarios.` },
+                              ].map((chip) => (
                                 <button
+                                  key={chip.label}
                                   type="button"
-                                  onClick={() => handleUpdateTriangle({
-                                    ...activeTriangle,
-                                    presion_motivo: `Déficit presupuestario y desvío hacia compromisos no registrados en ${config.entity_name}.`
-                                  })}
-                                  className="text-rose-400 hover:underline"
+                                  onClick={() => {
+                                    const current = activeTriangle.presion_motivo ? `${activeTriangle.presion_motivo}. ` : '';
+                                    handleUpdateTriangle({ ...activeTriangle, presion_motivo: `${current}${chip.text}` });
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 hover:bg-rose-900 border border-rose-500/30 transition text-[9px]"
                                 >
-                                  + Déficit
+                                  {chip.label}
                                 </button>
-                                <span>•</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateTriangle({
-                                    ...activeTriangle,
-                                    presion_motivo: `Apremio financiero de pagos urgentes a proveedores fuera del marco de la Ley de Compras.`
-                                  })}
-                                  className="text-rose-400 hover:underline"
-                                >
-                                  + Apremio
-                                </button>
-                              </div>
+                              ))}
                             </div>
                             <textarea
                               rows={3}
@@ -1423,29 +1910,27 @@ ${actingTeam.map((u) => `
                               <label className="text-[11px] text-slate-300 font-semibold">
                                 Fallas de Control Interno / NOBACI:
                               </label>
-                              <div className="flex items-center gap-1 text-[9px] text-slate-400">
+                            </div>
+                            {/* Predefined NOBACI / Control Variable Chips */}
+                            <div className="flex flex-wrap items-center gap-1 text-[9px] mb-1.5">
+                              {[
+                                { label: '+ Sin Segregación', text: `Ausencia de segregación de funciones entre autorización, custodia y registro contable en ${config.entity_name}.` },
+                                { label: '+ Control Previo Inoperante', text: `Inexistencia de control previo institucional y libramientos directos sin verificación de entrega.` },
+                                { label: '+ Firmas Concentradas', text: `Concentración unipersonal de autorizaciones de pago sin firmas mancomunadas de control.` },
+                                { label: '+ Bypass de Sistemas', text: `Ejecución de pagos fuera del sistema oficial SIGEF/ERP mediante hojas de cálculo manuales.` },
+                              ].map((chip) => (
                                 <button
+                                  key={chip.label}
                                   type="button"
-                                  onClick={() => handleUpdateTriangle({
-                                    ...activeTriangle,
-                                    oportunidad_motivo: `Ausencia de segregación de funciones entre quien autoriza, custodia y registra pagos en ${config.entity_name}.`
-                                  })}
-                                  className="text-amber-400 hover:underline"
+                                  onClick={() => {
+                                    const current = activeTriangle.oportunidad_motivo ? `${activeTriangle.oportunidad_motivo}. ` : '';
+                                    handleUpdateTriangle({ ...activeTriangle, oportunidad_motivo: `${current}${chip.text}` });
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-300 hover:bg-amber-900 border border-amber-500/30 transition text-[9px]"
                                 >
-                                  + Segregación
+                                  {chip.label}
                                 </button>
-                                <span>•</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateTriangle({
-                                    ...activeTriangle,
-                                    oportunidad_motivo: `Inexistencia de control previo institucional y libramientos directos sin verificación de entrega.`
-                                  })}
-                                  className="text-amber-400 hover:underline"
-                                >
-                                  + Control Previo
-                                </button>
-                              </div>
+                              ))}
                             </div>
                             <textarea
                               rows={3}
@@ -1587,29 +2072,27 @@ ${actingTeam.map((u) => `
                               <label className="text-[11px] text-slate-300 font-semibold">
                                 Discurso o Justificación Moral:
                               </label>
-                              <div className="flex items-center gap-1 text-[9px] text-slate-400">
+                            </div>
+                            {/* Predefined Cressey Rationalization Chips */}
+                            <div className="flex flex-wrap items-center gap-1 text-[9px] mb-1.5">
+                              {[
+                                { label: '+ Urgencia Alegada', text: `Alegato de supuesta 'urgencia institucional o emergencia sanitaria' para eludir los trámites de ley.` },
+                                { label: '+ Costumbre Administrativa', text: `Costumbre administrativa inveterada alegando que 'siempre se ha ejecutado de esta manera'.` },
+                                { label: '+ "Sin Daño Patrimonial"', text: `Justificación subjetiva alegando que las compras o servicios finalmente beneficiaron a la entidad.` },
+                                { label: '+ Agilización Operativa', text: `Pretexto de evitar 'burocracia legal excesiva' en perjuicio del marco de compras públicas.` },
+                              ].map((chip) => (
                                 <button
+                                  key={chip.label}
                                   type="button"
-                                  onClick={() => handleUpdateTriangle({
-                                    ...activeTriangle,
-                                    racionalizacion_motivo: `Alegato de supuesta 'urgencia institucional o emergencia sanitaria' para eludir los trámites de ley.`
-                                  })}
-                                  className="text-cyan-400 hover:underline"
+                                  onClick={() => {
+                                    const current = activeTriangle.racionalizacion_motivo ? `${activeTriangle.racionalizacion_motivo}. ` : '';
+                                    handleUpdateTriangle({ ...activeTriangle, racionalizacion_motivo: `${current}${chip.text}` });
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 hover:bg-cyan-900 border border-cyan-500/30 transition text-[9px]"
                                 >
-                                  + Urgencia
+                                  {chip.label}
                                 </button>
-                                <span>•</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateTriangle({
-                                    ...activeTriangle,
-                                    racionalizacion_motivo: `Costumbre administrativa inveterada alegando que 'siempre se ha ejecutado de esta manera'.`
-                                  })}
-                                  className="text-cyan-400 hover:underline"
-                                >
-                                  + Costumbre
-                                </button>
-                              </div>
+                              ))}
                             </div>
                             <textarea
                               rows={3}
@@ -2032,14 +2515,23 @@ ${actingTeam.map((u) => `
 
                     {/* Tabla Pericial Detallada del Triángulo del Fraude por Hallazgo */}
                     {dictamen.triangulo_fraude && dictamen.triangulo_fraude.length > 0 && (
-                      <div className="pt-2 overflow-x-auto">
+                      <div className="pt-2 overflow-x-auto space-y-2">
+                        <div className="text-[11px] text-slate-300 print:text-black bg-slate-900/60 print:bg-slate-50 p-2 rounded border border-slate-800 print:border-black flex flex-wrap items-center justify-between gap-2">
+                          <span>
+                            <strong>Modelo Ponderado Aplicado:</strong> {weightsConfig.estandar_nombre || 'Enfoque NOBACI / CGR'}
+                          </span>
+                          <span className="font-mono text-purple-300 print:text-black">
+                            P: {weightsConfig.peso_presion}% | O: {weightsConfig.peso_oportunidad}% | R: {weightsConfig.peso_racionalizacion}% (Total: 100%)
+                          </span>
+                        </div>
                         <table className="w-full text-left text-xs border border-slate-750 print:border-black rounded-lg overflow-hidden">
                           <thead className="bg-slate-900 text-slate-300 font-bold print:bg-slate-100 print:text-black">
                             <tr>
                               <th className="p-2 border-b border-slate-750 print:border-black">No. Hallazgo</th>
-                              <th className="p-2 border-b border-slate-750 print:border-black text-center text-rose-300 print:text-black">Presión (1-5)</th>
-                              <th className="p-2 border-b border-slate-750 print:border-black text-center text-amber-300 print:text-black">Oportunidad (1-5)</th>
-                              <th className="p-2 border-b border-slate-750 print:border-black text-center text-cyan-300 print:text-black">Racionalización (1-5)</th>
+                              <th className="p-2 border-b border-slate-750 print:border-black text-center text-rose-300 print:text-black">Presión ({weightsConfig.peso_presion}%)</th>
+                              <th className="p-2 border-b border-slate-750 print:border-black text-center text-amber-300 print:text-black">Oportunidad ({weightsConfig.peso_oportunidad}%)</th>
+                              <th className="p-2 border-b border-slate-750 print:border-black text-center text-cyan-300 print:text-black">Racionalización ({weightsConfig.peso_racionalizacion}%)</th>
+                              <th className="p-2 border-b border-slate-750 print:border-black text-center text-purple-300 print:text-black">Puntaje Pond. (1-5)</th>
                               <th className="p-2 border-b border-slate-750 print:border-black text-center">Riesgo Global</th>
                               <th className="p-2 border-b border-slate-750 print:border-black">Evidencias Técnicas & Soportes Vinculados</th>
                             </tr>
@@ -2049,6 +2541,7 @@ ${actingTeam.map((u) => `
                               const totalLinked = (tri.presion_documentos?.length || 0) + 
                                 (tri.oportunidad_documentos?.length || 0) + 
                                 (tri.racionalizacion_documentos?.length || 0);
+                              const wScore = (tri.puntaje_ponderado ?? calculateWeightedScore(tri.presion_nivel, tri.oportunidad_nivel, tri.racionalizacion_nivel, weightsConfig).scorePonderado).toFixed(2);
                               return (
                                 <tr key={tri.finding_id} className="hover:bg-slate-900/50 print:text-black">
                                   <td className="p-2 font-mono font-bold">
@@ -2058,6 +2551,7 @@ ${actingTeam.map((u) => `
                                   <td className="p-2 text-center font-bold text-rose-400 print:text-black font-mono">{tri.presion_nivel}/5</td>
                                   <td className="p-2 text-center font-bold text-amber-400 print:text-black font-mono">{tri.oportunidad_nivel}/5</td>
                                   <td className="p-2 text-center font-bold text-cyan-400 print:text-black font-mono">{tri.racionalizacion_nivel}/5</td>
+                                  <td className="p-2 text-center font-bold text-purple-400 print:text-black font-mono">{wScore}/5</td>
                                   <td className="p-2 text-center">
                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                       tri.riesgo_fraude_global === 'Crítico' ? 'bg-rose-500/20 text-rose-300 print:text-black' :

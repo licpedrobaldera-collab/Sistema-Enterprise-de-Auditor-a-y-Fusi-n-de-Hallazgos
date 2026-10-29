@@ -145,6 +145,19 @@ export interface UserAccount {
   es_master?: boolean;
 }
 
+export interface FraudTriangleWeights {
+  peso_presion: number; // Porcentaje de 0 a 100 (ej. 30)
+  peso_oportunidad: number; // Porcentaje de 0 a 100 (ej. 50)
+  peso_racionalizacion: number; // Porcentaje de 0 a 100 (ej. 20)
+  estandar_nombre?: string; // "Enfoque Control Interno (CGR/CCRD)", "Enfoque Penal (Ministerio Público)", "Estándar Clásico Cressey (ISSAI)", "Personalizado por la Entidad"
+  umbral_critico?: number; // Puntaje ponderado sobre 5 para nivel Crítico (ej: 4.2)
+  umbral_muy_alto?: number; // Puntaje sobre 5 para nivel Muy Alto (ej: 3.5)
+  umbral_alto?: number; // Puntaje sobre 5 para nivel Alto (ej: 2.8)
+  umbral_medio?: number; // Puntaje sobre 5 para nivel Medio (ej: 2.0)
+  modificado_por?: string;
+  fecha_modificacion?: string;
+}
+
 export interface FraudTriangleFinding {
   finding_id: number;
   numero_hallazgo: string;
@@ -166,8 +179,9 @@ export interface FraudTriangleFinding {
   racionalizacion_motivo: string; // Discurso exculpatorio, costumbre, emergencia alegada
   racionalizacion_evidencia_ref: string;
   racionalizacion_documentos?: string[]; // IDs o nombres de archivos de evidencia vinculados
-  // Síntesis Forense
+  // Síntesis Forense y Ponderación Personalizada
   riesgo_fraude_global: 'Bajo' | 'Medio' | 'Alto' | 'Muy Alto' | 'Crítico';
+  puntaje_ponderado?: number; // Puntuación de 1 a 5 calculada con los pesos institucionales
   sustento_tecnico_vinculado: string;
 }
 
@@ -277,6 +291,7 @@ export interface ExpertDictamen {
   conclusion_pericial: string;
   fundamento_legal: string[];
   triangulo_fraude?: FraudTriangleFinding[];
+  pesos_triangulo_fraude?: FraudTriangleWeights;
   evaluaciones_evidencias?: FindingEvidenceEvaluation[];
 }
 
