@@ -18,7 +18,7 @@ export interface AuditFinding {
   titulo: string;
   rubro: string;
   condicion: string; // Condición observada completa (hechos objetivos)
-  clasificacion_tipo: ClassificationType; // 'Debilidad de Control Interno' | 'Hallazgo de Auditoría'
+  clasificacion_tipo?: ClassificationType; // 'Debilidad de Control Interno' | 'Hallazgo de Auditoría'
   marco_normativo?: string; // Marco legal o normativo aplicable (Ley 340-06, NOBACI, etc.)
   analisis_pericial?: string; // Análisis técnico-pericial y valoración de impacto
   posible_fusion?: string; // Posible fusión de hallazgos afines por marco normativo y causa
@@ -110,6 +110,17 @@ export interface AuditTypeOption {
   defaultRubros: string[];
 }
 
+export interface CredentialChangeLog {
+  id: string;
+  fecha: string;
+  usuario_afectado: string;
+  modificado_por: string;
+  tipo_cambio: 'CREDENCIALES' | 'CLAVE' | 'FIRMA' | 'PERMISOS' | 'ASIGNACION';
+  descripcion: string;
+  valor_anterior?: string;
+  valor_nuevo?: string;
+}
+
 export interface UserAccount {
   id: string;
   identificacion: string; // RNC o Cédula de Identidad
@@ -122,12 +133,87 @@ export interface UserAccount {
   especialidad?: string; // Especialidad técnica (ej: Auditoría Forense y Delitos Económicos)
   telefono?: string;
   firma_digital?: string; // Imagen Base64 de firma o trazo de firma digitalizada
+  sello_digital_hash?: string; // Hash criptográfico de la firma certificada
   password: string; // Clave sin fecha de vencimiento
   historial_claves: string[]; // Histórico de claves previas
+  historial_credenciales?: CredentialChangeLog[]; // Registro de auditoría de modificaciones
+  asignaciones_auditorias?: string[]; // IDs de expedientes asignados o ['ALL'] para todas
+  permiso_editar_aprobados?: boolean; // Permiso explícito de admin para editar aprobados
   fecha_creacion: string;
   ultimo_acceso: string;
   estado: 'Activo' | 'Suspendido';
   es_master?: boolean;
+}
+
+export interface FraudTriangleFinding {
+  finding_id: number;
+  numero_hallazgo: string;
+  titulo: string;
+  rubro?: string;
+  monto?: number;
+  // Vértice 1: Presión / Incentivo
+  presion_nivel: number; // 1 a 5
+  presion_motivo: string; // Justificación o motivación detectada
+  presion_evidencia_ref: string; // Documento o fuente vinculada
+  presion_documentos?: string[]; // IDs o nombres de archivos de evidencia vinculados
+  // Vértice 2: Oportunidad Percibida
+  oportunidad_nivel: number; // 1 a 5
+  oportunidad_motivo: string; // Ausencia de control, firmas no segregadas, NOBACI
+  oportunidad_evidencia_ref: string;
+  oportunidad_documentos?: string[]; // IDs o nombres de archivos de evidencia vinculados
+  // Vértice 3: Racionalización / Justificación
+  racionalizacion_nivel: number; // 1 a 5
+  racionalizacion_motivo: string; // Discurso exculpatorio, costumbre, emergencia alegada
+  racionalizacion_evidencia_ref: string;
+  racionalizacion_documentos?: string[]; // IDs o nombres de archivos de evidencia vinculados
+  // Síntesis Forense
+  riesgo_fraude_global: 'Bajo' | 'Medio' | 'Alto' | 'Muy Alto' | 'Crítico';
+  sustento_tecnico_vinculado: string;
+}
+
+
+export interface ForensicEvidenceCriterion {
+  id: string;
+  codigo_norma: string; // Ej: "INTOSAI-5000", "CPP-ART26", "NOBACI-04"
+  nombre: string;
+  descripcion: string;
+  cumplido: boolean;
+  observacion_auditor: string;
+}
+
+export interface EvidenceFileSupport {
+  id: string;
+  nombre: string;
+  tipo: string;
+  tamanio: string;
+  hash_sha256: string;
+  fecha_carga: string;
+}
+
+export interface FindingEvidenceEvaluation {
+  finding_id: number;
+  numero_hallazgo: string;
+  titulo: string;
+  pagina_referencia: string;
+  punto_incidencia: string;
+  // Lo que el auditor debe comprobar y sustentar
+  evidencias_a_comprobar: string[];
+  // Lo que el supervisor debe verificar y evaluar
+  puntos_supervision: string[];
+  // Checklist exigible Ministerio Público & Auditoría Forense
+  criterios_mp: ForensicEvidenceCriterion[];
+  // Soportes documentales cargados
+  archivos_soporte: EvidenceFileSupport[];
+  // Nivel de cumplimiento de 1 a 5
+  nivel_cumplimiento: number;
+  // Aprobación y Validación con IA
+  aprobada_ia: boolean; // Requiere 5/5
+  ia_feedback: {
+    observaciones_penales: string;
+    faltantes_especificos: string[];
+    recomendaciones_paso_a_paso: string[];
+    fecha_validacion?: string;
+  };
 }
 
 export interface AuditCaseRecord {
@@ -190,6 +276,8 @@ export interface ExpertDictamen {
   respuestas_cuestionario: Array<{ pregunta: string; respuesta: string }>;
   conclusion_pericial: string;
   fundamento_legal: string[];
+  triangulo_fraude?: FraudTriangleFinding[];
+  evaluaciones_evidencias?: FindingEvidenceEvaluation[];
 }
 
 export interface CountryOption {

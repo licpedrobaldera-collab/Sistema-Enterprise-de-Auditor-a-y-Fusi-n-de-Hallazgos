@@ -64,22 +64,89 @@ import {
 import { exportToExcel, exportToPDF, exportToWord, exportToCSV } from './utils/exporters';
 
 export default function App() {
-  // Institutional Config & Findings
-  const [config, setConfig] = useState<InstitutionalConfig>(INITIAL_CONFIG);
-  const [findings, setFindings] = useState<AuditFinding[]>(INITIAL_FINDINGS);
-  const [rules, setRules] = useState<FusionRule[]>(INITIAL_RULES);
+  // Institutional Config & Findings (with localStorage persistent storage)
+  const [config, setConfig] = useState<InstitutionalConfig>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_CONFIG_PERSIST');
+      return saved ? JSON.parse(saved) : INITIAL_CONFIG;
+    } catch {
+      return INITIAL_CONFIG;
+    }
+  });
+
+  const [findings, setFindings] = useState<AuditFinding[]>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_FINDINGS_PERSIST');
+      return saved ? JSON.parse(saved) : INITIAL_FINDINGS;
+    } catch {
+      return INITIAL_FINDINGS;
+    }
+  });
+
+  const [rules, setRules] = useState<FusionRule[]>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_RULES_PERSIST');
+      return saved ? JSON.parse(saved) : INITIAL_RULES;
+    } catch {
+      return INITIAL_RULES;
+    }
+  });
 
   // Security, Users & RBAC
-  const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
-  const [currentUser, setCurrentUser] = useState<UserAccount>(MASTER_USER);
+  const [users, setUsers] = useState<UserAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_USERS_PERSIST');
+      return saved ? JSON.parse(saved) : INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserAccount>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_CURRENT_USER_PERSIST');
+      return saved ? JSON.parse(saved) : MASTER_USER;
+    } catch {
+      return MASTER_USER;
+    }
+  });
 
   // Historical Cases & Workspaces
-  const [caseHistory, setCaseHistory] = useState<AuditCaseRecord[]>(INITIAL_CASE_HISTORY);
-  const [activeCaseId, setActiveCaseId] = useState<string | null>('EXP-2026-BALDERA-01');
+  const [caseHistory, setCaseHistory] = useState<AuditCaseRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_CASES_PERSIST');
+      return saved ? JSON.parse(saved) : INITIAL_CASE_HISTORY;
+    } catch {
+      return INITIAL_CASE_HISTORY;
+    }
+  });
+
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('AUDIT_ACTIVE_CASE_ID') || 'EXP-2026-BALDERA-01';
+    } catch {
+      return 'EXP-2026-BALDERA-01';
+    }
+  });
 
   // Contracts & Forensic Dictamen
-  const [contracts, setContracts] = useState<ContractRecord[]>(INITIAL_CONTRACTS);
-  const [dictamen, setDictamen] = useState<ExpertDictamen>(INITIAL_EXPERT_DICTAMEN);
+  const [contracts, setContracts] = useState<ContractRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_CONTRACTS_PERSIST');
+      return saved ? JSON.parse(saved) : INITIAL_CONTRACTS;
+    } catch {
+      return INITIAL_CONTRACTS;
+    }
+  });
+
+  const [dictamen, setDictamen] = useState<ExpertDictamen>(() => {
+    try {
+      const saved = localStorage.getItem('AUDIT_DICTAMEN_PERSIST');
+      return saved ? JSON.parse(saved) : INITIAL_EXPERT_DICTAMEN;
+    } catch {
+      return INITIAL_EXPERT_DICTAMEN;
+    }
+  });
 
   // Modals state
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -91,6 +158,62 @@ export default function App() {
   const [isContractOpen, setIsContractOpen] = useState(false);
   const [isDictamenOpen, setIsDictamenOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Auto-save across all modules
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_CONFIG_PERSIST', JSON.stringify(config));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [config]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_FINDINGS_PERSIST', JSON.stringify(findings));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [findings]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_RULES_PERSIST', JSON.stringify(rules));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [rules]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_USERS_PERSIST', JSON.stringify(users));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [users]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_CURRENT_USER_PERSIST', JSON.stringify(currentUser));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [currentUser]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_CASES_PERSIST', JSON.stringify(caseHistory));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [caseHistory]);
+
+  React.useEffect(() => {
+    try {
+      if (activeCaseId) localStorage.setItem('AUDIT_ACTIVE_CASE_ID', activeCaseId);
+      else localStorage.removeItem('AUDIT_ACTIVE_CASE_ID');
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [activeCaseId]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_CONTRACTS_PERSIST', JSON.stringify(contracts));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [contracts]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('AUDIT_DICTAMEN_PERSIST', JSON.stringify(dictamen));
+    } catch (e) { console.warn('Local storage error:', e); }
+  }, [dictamen]);
 
   // Notifications state
   const [notifications, setNotifications] = useState<AuditNotification[]>([]);
@@ -118,6 +241,16 @@ export default function App() {
 
   // 1. Clean Database (0 findings & 0 rules)
   const handleCleanDatabase = () => {
+    const isMaster = currentUser.es_master || currentUser.rol === 'MASTER_ADMIN' || currentUser.email === 'licpedrobaldera@gmail.com';
+    if (!isMaster) {
+      addNotification(
+        'Acceso Restringido',
+        'Solo el Administrador Master Lic. Pedro Baldera puede vaciar la base de datos por completo.',
+        'danger',
+        'security'
+      );
+      return;
+    }
     setFindings([]);
     setRules([]);
     setActiveCaseId(null);
@@ -244,6 +377,17 @@ export default function App() {
   };
 
   const handleDeleteFinding = (id: number) => {
+    const target = findings.find((f) => f.id === id);
+    const isMaster = currentUser.es_master || currentUser.rol === 'MASTER_ADMIN' || currentUser.email === 'licpedrobaldera@gmail.com';
+    if (target && target.estado_supervision === 'Aprobado (10/10)' && !isMaster) {
+      addNotification(
+        'Acceso Restringido',
+        'Solo el Administrador Lic. Pedro Baldera puede eliminar hallazgos aprobados por control de calidad.',
+        'danger',
+        'security'
+      );
+      return;
+    }
     setFindings((prev) => prev.filter((f) => f.id !== id));
     addNotification('Hallazgo Eliminado', `Se ha removido el hallazgo #${id}.`, 'warning');
   };
@@ -476,6 +620,7 @@ export default function App() {
           findings={findings}
           rules={rules}
           currency={config.currency_symbol || config.currency}
+          currentUser={currentUser}
           onUpdateFinding={handleUpdateFinding}
           onDeleteFinding={handleDeleteFinding}
           onAddFinding={handleAddFinding}
@@ -524,6 +669,7 @@ export default function App() {
         onClose={() => setIsUserOpen(false)}
         currentUser={currentUser}
         users={users}
+        activeCaseId={activeCaseId}
         onUpdateUsers={(updated) => setUsers(updated)}
         onSwitchUser={(user) => setCurrentUser(user)}
         onNotify={addNotification}

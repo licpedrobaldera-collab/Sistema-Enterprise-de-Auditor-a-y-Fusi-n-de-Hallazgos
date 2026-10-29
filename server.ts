@@ -454,6 +454,217 @@ Devuelve JSON:
   }
 });
 
+// AI Endpoint: Forensic Evidence & Ministerio Público Checklist Validation
+app.post("/api/ai/validate-forensic-evidence", async (req, res) => {
+  try {
+    const { finding, checklist, uploadedFiles, currentScore } = req.body;
+    if (!finding) {
+      return res.status(400).json({ error: "Faltan datos del hallazgo a evaluar." });
+    }
+
+    const filesSummary = Array.isArray(uploadedFiles) && uploadedFiles.length > 0
+      ? uploadedFiles.map((f: any) => `- Archivo: ${f.nombre} (${f.tipo}), Hash SHA-256: ${f.hash_sha256}`).join("\n")
+      : "No se han adjuntado archivos o soportes documentales en el expediente digital.";
+
+    const criteriaSummary = Array.isArray(checklist)
+      ? checklist.map((c: any) => `- [${c.cumplido ? "CUMPLIDO" : "PENDIENTE"}] ${c.nombre} (${c.codigo_norma}): ${c.observacion_auditor || "Sin observaciones"}`).join("\n")
+      : "Checklist no suministrado.";
+
+    const prompt = `Actúa como Perito Forense y Fiscal Especializado en Delitos Económicos y Anticorrupción (Ministerio Público / PEPCA).
+Evalúa la integridad probatoria del siguiente hallazgo de auditoría para determinar si resiste un juicio de fondo penal o administrativo:
+
+Hallazgo:
+- No. / Referencia: ${finding.numero_hallazgo || finding.id} | ${finding.pagina_referencia || "Pág. N/A"}
+- Título: ${finding.titulo}
+- Condición (hechos): ${finding.condicion}
+- Criterio Legal: ${finding.norma_ley_nombre || finding.criterio}
+- Punto de Incidencia: ${finding.punto_incidencia || "No especificado"}
+- Monto involucrado: ${finding.monto || 0}
+
+Archivos de soporte cargados:
+${filesSummary}
+
+Checklist de Criterios Exigibles del Ministerio Público & ISSAI 5000:
+${criteriaSummary}
+
+REGLAS DE EVALUACIÓN:
+1. Califica el nivel de cumplimiento estricto de 1 a 5 (escala entera 1, 2, 3, 4 o 5).
+2. Para otorgar 5/5, la evidencia debe tener:
+   - Soportes documentales reales (al menos 1 archivo o evidencia documental comprobable con hash de custodia).
+   - Cadena de custodia garantizada.
+   - Idoneidad probatoria penal y veracidad de origen.
+3. Si el nivel es menor a 5/5, indica claramente:
+   - "aprobada_ia": false
+   - Observaciones penales directas y contundentes sobre los riesgos de desestimación en tribunal.
+   - Lista de "faltantes_especificos" (exactamente qué documentos, certificaciones o cruces faltan).
+   - "recomendaciones_paso_a_paso" numeradas para que el auditor pueda corregir y cargar nuevamente hasta alcanzar 5/5.
+4. Si el nivel es 5/5:
+   - "aprobada_ia": true
+   - Observaciones de aprobación con fe pública e integridad penal plena.
+   - Faltantes: []
+   - Recomendaciones: ["Expediente listo con plena validez procesal para acusación y juicio de fondo."]
+
+Devuelve EXCLUSIVAMENTE JSON con esta estructura:
+{
+  "nivel_cumplimiento": 1 | 2 | 3 | 4 | 5,
+  "aprobada_ia": boolean,
+  "ia_feedback": {
+    "observaciones_penales": "...",
+    "faltantes_especificos": ["..."],
+    "recomendaciones_paso_a_paso": ["..."],
+    "fecha_validacion": "..."
+  }
+}
+`;
+
+    if (ai) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.8-flash",
+          contents: prompt,
+          config: {
+            temperature: 0.1,
+            responseMimeType: "application/json",
+          },
+        });
+        const parsed = JSON.parse(response.text || "{}");
+        return res.json({ success: true, source: "gemini-3.8-flash", ...parsed });
+      } catch (geminiErr) {
+        console.warn("Gemini validation error:", geminiErr);
+      }
+    }
+
+    // Heuristic Fallback
+    const fulfilledCount = (checklist || []).filter((c: any) => c.cumplido).length;
+    const totalCriteria = (checklist || []).length || 6;
+    const hasFiles = Array.isArray(uploadedFiles) && uploadedFiles.length > 0;
+    
+    let score = Math.max(1, Math.min(5, Math.round((fulfilledCount / totalCriteria) * 4) + (hasFiles ? 1 : 0)));
+    const isApproved = score === 5 && hasFiles;
+
+    return res.json({
+      success: true,
+      source: "motor-forense-reglas",
+      nivel_cumplimiento: score,
+      aprobada_ia: isApproved,
+      ia_feedback: {
+        observaciones_penales: isApproved 
+          ? "El expediente reúne suficiencia probatoria, cadena de custodia inalterada y sustento documental fehaciente exigible por el Ministerio Público."
+          : "El soporte actual presenta riesgos de impugnación procesal por falta de compulsa cruzada o acreditación de cadena de custodia.",
+        faltantes_especificos: isApproved ? [] : [
+          !hasFiles ? "Falta adjuntar copias digitales foliadas de los comprobantes, cheques o contratos originales." : "",
+          fulfilledCount < 5 ? "Falta verificación de legalidad en la obtención y firma del custodio de la evidencia." : "",
+        ].filter(Boolean),
+        recomendaciones_paso_a_paso: isApproved 
+          ? ["Conservar resguardo criptográfico del expediente para vista de causa judicial."] 
+          : [
+              "1. Subir al menos un documento o acta con firma y sello oficial del organismo emisor.",
+              "2. Marcar el cumplimiento de los 6 criterios exigibles en la lista de verificación.",
+              "3. Especificar el folio exacto y número de comprobante para blindar el sustento penal."
+            ],
+        fecha_validacion: new Date().toISOString(),
+      }
+    });
+  } catch (err: any) {
+    console.error("Evidence validation error:", err);
+    res.status(500).json({ error: "Error evaluando evidencia con IA.", details: err.message });
+  }
+});
+
+// AI Endpoint: Fraud Triangle Analysis
+app.post("/api/ai/analyze-fraud-triangle", async (req, res) => {
+  try {
+    const { finding } = req.body;
+    if (!finding) {
+      return res.status(400).json({ error: "Falta el hallazgo para análisis del Triángulo del Fraude." });
+    }
+
+    const prompt = `Actúa como Criminólogo y Auditor Forense Certificado (CFE) aplicando la teoría del Triángulo del Fraude de Donald Cressey.
+Analiza el siguiente hallazgo de auditoría:
+- Título: ${finding.titulo}
+- Condición: ${finding.condicion}
+- Criterio: ${finding.norma_ley_nombre || finding.criterio}
+- Causa: ${finding.causa || "No especificada"}
+- Monto: ${finding.monto || 0}
+- Rubro: ${finding.rubro || "General"}
+
+Determina para este hallazgo los tres vértices del Triángulo del Fraude con escala de calificación del 1 al 5 (1=Mínimo/Residual, 2=Bajo, 3=Moderado, 4=Alto, 5=Crítico/Extremo):
+1. PRESIÓN / INCENTIVO: Motivo económico, político, deudas, cumplimiento forzado de metas o afán de lucro que empujó al sujeto.
+2. OPORTUNIDAD PERCIBIDA: Fallas de control interno, falta de supervisión NOBACI, concentración de firmas o desorden que permitió cometer y ocultar el fraude.
+3. RACIONALIZACIÓN / JUSTIFICACIÓN: Mecanismo psicológico de neutralización moral (ej. "todos lo hacen", "es por el bien de la institución", "el Estado me debe").
+4. RIESGO GLOBAL DE FRAUDE: 'Bajo' | 'Medio' | 'Alto' | 'Muy Alto' | 'Crítico'.
+5. SUSTENTO TÉCNICO VINCULADO: Síntesis pericial vinculada a las pruebas documentales.
+
+Devuelve EXCLUSIVAMENTE JSON con esta estructura:
+{
+  "finding_id": ${finding.id},
+  "numero_hallazgo": "${finding.numero_hallazgo || finding.id}",
+  "titulo": "${(finding.titulo || "").replace(/"/g, '\\"')}",
+  "rubro": "${finding.rubro || ""}",
+  "monto": ${finding.monto || 0},
+  "presion_nivel": 4,
+  "presion_motivo": "...",
+  "presion_evidencia_ref": "...",
+  "oportunidad_nivel": 5,
+  "oportunidad_motivo": "...",
+  "oportunidad_evidencia_ref": "...",
+  "racionalizacion_nivel": 3,
+  "racionalizacion_motivo": "...",
+  "racionalizacion_evidencia_ref": "...",
+  "riesgo_fraude_global": "Crítico",
+  "sustento_tecnico_vinculado": "..."
+}
+`;
+
+    if (ai) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.8-flash",
+          contents: prompt,
+          config: {
+            temperature: 0.15,
+            responseMimeType: "application/json",
+          },
+        });
+        const parsed = JSON.parse(response.text || "{}");
+        return res.json({ success: true, source: "gemini-3.8-flash", data: parsed });
+      } catch (geminiErr) {
+        console.warn("Gemini fraud triangle error:", geminiErr);
+      }
+    }
+
+    // Heuristic fallback
+    const isHighAmount = (finding.monto || 0) > 10000000;
+    const isCriticalRisk = finding.riesgo === 'Crítico';
+    
+    return res.json({
+      success: true,
+      source: "reglas-forenses-heuristica",
+      data: {
+        finding_id: finding.id,
+        numero_hallazgo: finding.numero_hallazgo || `${finding.id}`,
+        titulo: finding.titulo,
+        rubro: finding.rubro,
+        monto: finding.monto || 0,
+        presion_nivel: isHighAmount ? 5 : 4,
+        presion_motivo: "Presión económica o desvío de fondos públicos hacia compromisos particulares y déficit presupuestario.",
+        presion_evidencia_ref: finding.pagina_referencia || "Cédula analítica del expediente",
+        oportunidad_nivel: isCriticalRisk ? 5 : 4,
+        oportunidad_motivo: "Ausencia de controles previos en Tesorería, inobservancia de NOBACI y falta de integración con SIGEF.",
+        oportunidad_evidencia_ref: finding.evidencia_soporte || "Libramiento de pago y estados bancarios",
+        racionalizacion_nivel: 4,
+        racionalizacion_motivo: "Uso de pretextos de 'urgencia hospitalaria' para obviar los procedimientos de la Ley 340-06.",
+        racionalizacion_evidencia_ref: "Comunicaciones internas y actas del comité",
+        riesgo_fraude_global: isCriticalRisk ? "Crítico" : "Alto",
+        sustento_tecnico_vinculado: `Convergencia de los 3 vértices: alta oportunidad por desarticulación de controles y beneficio patrimonial por ${finding.monto || 0}.`
+      }
+    });
+  } catch (err: any) {
+    console.error("Fraud triangle analysis error:", err);
+    res.status(500).json({ error: "Error analizando Triángulo del Fraude.", details: err.message });
+  }
+});
+
 // Download scripts endpoints
 app.get("/api/download/python-script", (_req, res) => {
   const filePath = path.resolve(process.cwd(), "public/assets/aistudio/sistema_analisis_hallazgos_baldera_V2_5800e22b.py");

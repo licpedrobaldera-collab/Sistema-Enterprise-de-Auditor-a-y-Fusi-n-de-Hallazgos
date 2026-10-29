@@ -19,15 +19,17 @@ import {
   Scale,
   CheckCircle2,
   XCircle,
-  Check
+  Check,
+  Lock
 } from 'lucide-react';
-import { AuditFinding, RiskLevel, FusionRule, SupervisorStatus } from '../types/audit';
+import { AuditFinding, RiskLevel, FusionRule, SupervisorStatus, UserAccount } from '../types/audit';
 import { formatCurrency } from '../utils/exporters';
 
 interface FindingsTableProps {
   findings: AuditFinding[];
   rules: FusionRule[];
   currency: string;
+  currentUser?: UserAccount;
   onUpdateFinding: (updated: AuditFinding) => void;
   onDeleteFinding: (id: number) => void;
   onAddFinding: (newFinding: AuditFinding) => void;
@@ -38,11 +40,27 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
   findings,
   rules,
   currency,
+  currentUser,
   onUpdateFinding,
   onDeleteFinding,
   onAddFinding,
   onOpenVoiceModal,
 }) => {
+  const isMasterAdmin = !currentUser || currentUser.es_master || currentUser.rol === 'MASTER_ADMIN' || currentUser.email === 'licpedrobaldera@gmail.com';
+
+  const canDeleteFinding = (finding: AuditFinding) => {
+    if (isMasterAdmin) return true;
+    if (finding.estado_supervision === 'Aprobado (10/10)') return false;
+    return true;
+  };
+
+  const canEditFinding = (finding: AuditFinding) => {
+    if (isMasterAdmin) return true;
+    if (finding.estado_supervision === 'Aprobado (10/10)') {
+      return !!currentUser?.permiso_editar_aprobados;
+    }
+    return true;
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRubro, setSelectedRubro] = useState<string>('ALL');
   const [selectedRisk, setSelectedRisk] = useState<string>('ALL');
@@ -483,20 +501,38 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                           <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
                         </button>
                         <button
-                          onClick={() => handleStartEdit(finding)}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                          title="Editar Cédula y Citas Legales"
+                          onClick={() => {
+                            if (!canEditFinding(finding)) {
+                              alert('Acceso Restringido: El hallazgo está Aprobado (10/10) por el Administrador. Solo el Administrador Lic. Pedro Baldera puede autorizar la edición de datos aprobados en Gestión de Usuarios.');
+                              return;
+                            }
+                            handleStartEdit(finding);
+                          }}
+                          className={`p-1 rounded transition ${
+                            canEditFinding(finding)
+                              ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white'
+                              : 'bg-slate-900 text-slate-600 cursor-not-allowed'
+                          }`}
+                          title={canEditFinding(finding) ? "Editar Cédula y Citas Legales" : "Edición bloqueada: Aprobado por Administrador"}
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => {
+                            if (!canDeleteFinding(finding)) {
+                              alert('Acceso Restringido: Los colaboradores no pueden borrar datos aprobados por el Administrador Lic. Pedro Baldera.');
+                              return;
+                            }
                             if (window.confirm(`¿Desea descartar o eliminar el hallazgo No. ${finding.numero_hallazgo}?`)) {
                               onDeleteFinding(finding.id);
                             }
                           }}
-                          className="p-1 rounded bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 transition"
-                          title="Eliminar o descartar hallazgo"
+                          className={`p-1 rounded transition ${
+                            canDeleteFinding(finding)
+                              ? 'bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300'
+                              : 'bg-slate-900 text-slate-600 cursor-not-allowed'
+                          }`}
+                          title={canDeleteFinding(finding) ? "Eliminar o descartar hallazgo" : "Borrado bloqueado: Aprobado por Administrador"}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
