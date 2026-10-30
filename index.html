@@ -1,20 +1,21 @@
 <!doctype html>
 <html lang="es">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sistema Enterprise de Auditoría y Fusión de Hallazgos | Lic. Pedro A. Baldera</title>
-    <meta name="description" content="Plataforma corporativa de auditoría forense, financiera y de control gubernamental con extracción multiformato, fusión inteligente de hallazgos, edición en vivo y exportación avanzada en PDF, Excel y Word." />
-    <meta property="og:title" content="Sistema Enterprise de Auditoría y Fusión de Hallazgos" />
-    <meta property="og:description" content="Plataforma corporativa de auditoría forense, financiera y de control gubernamental con extracción multiformato, fusión inteligente de hallazgos, edición en vivo y exportación avanzada en PDF, Excel y Word." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-slate-900 text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
-    <div id="root"></div>
+    <title>Sistema Enterprise de Auditoría y Fusión de Hallazgos</title>
+    <script src="https://tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 antialiased min-h-screen flex flex-col justify-between">
+    <header class="w-full max-w-7xl mx-auto px-6 py-4 flex justify-between items-center border-b border-slate-800">
+        <span class="text-blue-500 font-extrabold text-xl">ENTERPRISE</span>
+        <a href="https://fusiondehallazgos.streamlit.app/" target="_blank" rel="noopener noreferrer" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+            Probar en Línea (Streamlit)
+        </a>
+    </header>
+    <main class="flex-grow flex items-center justify-center p-6">
+        <div id="root" class="w-full max-w-7xl"></div>
+    </main>
     <script type="module" src="/src/main.tsx"></script>
-  </body>
+</body>
 </html>
